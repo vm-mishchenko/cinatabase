@@ -17,7 +17,21 @@
     "lib": [
       "es2018",
       "dom"
-    ]
+    ],
+    "paths": {
+      "pouchdb": [
+        "./node_modules/pouchdb"
+      ],
+      "pouchdb/*": [
+        "./node_modules/pouchdb/*"
+      ],
+      "pouchdb-utils": [
+        "./node_modules/pouchdb-utils"
+      ],
+      "pouchdb-utils/*": [
+        "./node_modules/pouchdb-utils/*"
+      ]
+    }
   },
   "angularCompilerOptions": {
     "fullTemplateTypeCheck": true,

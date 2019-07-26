@@ -13,14 +13,14 @@ export const REMOTE_STORE_TOKEN = Symbol.for('REMOTE_STORE_TOKEN');
 
 @injectable()
 export class RemoteStoreFactory implements IStore {
-  database: PouchDB;
+  database: PouchDB.Database;
 
   constructor() {
     this.initializeDatabase();
   }
 
-  doc(name: string): IRemoteDocStore {
-    return new PouchDbRemoteDocStore(this.database);
+  doc<M>(name: string): IRemoteDocStore {
+    return new PouchDbRemoteDocStore<M>(name, this.database);
   }
 
   collection(name: string): IMemoryCollectionStore {

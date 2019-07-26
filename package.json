@@ -40,6 +40,7 @@
     "pouchdb-find": "^7.0.0"
   },
   "devDependencies": {
+    "@types/pouchdb": "^6.4.0",
     "@types/jest": "24.0.9",
     "@types/pouchdb-find": "^6.3.4",
     "jest": "^24.8.0",

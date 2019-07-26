@@ -18,8 +18,12 @@ export class AppModule {
   constructor() {
     const db = new Database();
 
-    db.doc('test').get().then((data) => {
-      console.log(data);
+    db.doc('test').update({
+      foo: 'foo',
+    }).result.then(() => {
+      db.doc('test').get().then((data) => {
+        console.log(data);
+      });
     });
   }
 }

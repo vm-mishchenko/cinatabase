@@ -49,7 +49,7 @@ export class Database {
     });
   }
 
-  doc(name: string): IDoc {
+  doc<M>(name: string): IDoc {
     if (!this.cachedDocs.has(name)) {
       this.cachedDocs.set(name, this.injector.get<DocFactory>(DOC_FACTORY_TOKEN).get(name));
     }
