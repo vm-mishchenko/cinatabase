@@ -3,6 +3,8 @@ import { Database } from '../database';
 import { REMOTE_STORE_TOKEN } from '../remote/remote-store.factory';
 import { FakeRemoteStore } from '../remote/test/fake-remote.store';
 
+// https://jestjs.io/docs/en/expect
+
 class TestDatabase extends Database {
   constructor() {
     const services = new Map();
@@ -33,7 +35,7 @@ describe('Doc integration', () => {
     db.getRemoteStorage().clearDatabase();
   });
 
-  describe('[get]', () => {
+  describe('[get method]', () => {
     it('should read from remote store initially', done => {
       const remoteGetResult = Promise.resolve({ remote: true });
       const fakeRemoteDoc = {
@@ -99,7 +101,7 @@ describe('Doc integration', () => {
     });
   });
 
-  describe('[update]', () => {
+  describe('[update method]', () => {
     it('should return previously updated value for the same doc', done => {
       const docName = 'test';
       const newData = { foo: 'foo' };
@@ -121,14 +123,61 @@ describe('Doc integration', () => {
       db.doc(docName)
         .update(newData)
         .result.then(() => {
-          // imitate that doc is created by some other client
-          // in the same session
-          return db.doc(docName).get();
-        })
+        // imitate that doc is created by some other client
+        // in the same session
+        return db.doc(docName).get();
+      })
         .then(docData => {
           expect(docData).toEqual(newData);
           done();
         });
+    });
+
+    it('should update only subset of field not overriding all of them', (done) => {
+      const doc = db.doc('test');
+
+      doc.update({
+        first: 'first',
+        second: 'second',
+      }).result
+        .then(() => {
+          return doc.update({
+            first: 'foo',
+          }).result;
+        })
+        .then(() => doc.get())
+        .then((docData) => {
+          expect(docData).toEqual({
+            first: 'foo',
+            second: 'second',
+          });
+
+          done();
+        });
+    });
+  });
+
+  describe('[onSnapshot method]', () => {
+    it('should return initial document value', (done) => {
+      db.doc('test').onSnapshot().subscribe((docSnapshot) => {
+        expect(docSnapshot).toEqual({});
+        done();
+      });
+    });
+
+    it('should return updated value', () => {
+      const snapshotCallback = jest.fn();
+
+      db.doc('test').onSnapshot().subscribe(snapshotCallback);
+
+      const newData = {
+        foo: 'foo',
+      };
+
+      return db.doc('test').update(newData).result.then(() => {
+        expect(snapshotCallback.mock.calls.length).toEqual(2);
+        expect(snapshotCallback).toHaveBeenLastCalledWith(newData);
+      });
     });
   });
 });

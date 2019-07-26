@@ -19,7 +19,8 @@ class FakeMemoryStoreFactory implements IStore {
       },
 
       onSnapshot() {
-        return new Subject().subscribe(() => {});
+        return new Subject().subscribe(() => {
+        });
       },
     };
   }

@@ -1,4 +1,4 @@
-import { Subscription } from 'rxjs';
+import { Observable } from 'rxjs';
 import { IMemoryDocStore, IRemoteDocStore } from '../interfaces';
 import { IMediator } from '../mediator';
 
@@ -6,6 +6,8 @@ export interface IDoc {
   update(data: any): IDocUpdateResult;
 
   get(): Promise<any>;
+
+  onSnapshot(): Observable<any>;
 }
 
 export interface IDocUpdateResult {
@@ -25,7 +27,8 @@ class DocUpdateResult implements IDocUpdateResult {
   memory: Promise<any> = this.memoryPromise;
   result: Promise<any> = Promise.all([this.remotePromise, this.memoryPromise]);
 
-  constructor(private memoryPromise: Promise<any>, private remotePromise: Promise<any>) {}
+  constructor(private memoryPromise: Promise<any>, private remotePromise: Promise<any>) {
+  }
 }
 
 /**
@@ -33,14 +36,15 @@ class DocUpdateResult implements IDocUpdateResult {
  */
 export class Doc implements IDoc {
   private isSyncedWithRemote = false;
-  private cachedGetRequest: Promise<any>;
+  private cachedGetRequest: Promise<any> = null;
 
   constructor(
     private name: string,
     private memoryStore: IMemoryDocStore,
     private remoteStore: IRemoteDocStore,
     private eventService: IMediator,
-  ) {}
+  ) {
+  }
 
   /**
    * Updates memory and remote store data.
@@ -92,7 +96,7 @@ export class Doc implements IDoc {
     return `${this.name} document`;
   }
 
-  onSnapshot(fn: (data: any) => void): Subscription {
-    return this.memoryStore.onSnapshot(fn);
+  onSnapshot(): Observable<any> {
+    return this.memoryStore.onSnapshot();
   }
 }

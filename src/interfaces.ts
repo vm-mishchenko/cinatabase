@@ -1,4 +1,4 @@
-import { Subscription } from 'rxjs';
+import { Observable, Subscription } from 'rxjs';
 
 // memory interfaces
 export interface IMemoryDocStore {
@@ -6,7 +6,7 @@ export interface IMemoryDocStore {
 
   update(data: any): Promise<any>;
 
-  onSnapshot(fn: (data: any) => any): Subscription;
+  onSnapshot(): Observable<any>;
 }
 
 export interface IMemoryCollectionStore {
