@@ -5,8 +5,7 @@ import { IRemoteDocStore } from '../../interfaces';
  * In memory remote doc implementation for testing purpose.
  */
 export class FakeRemoteDoc implements IRemoteDocStore {
-  constructor(private name: string, private database: any) {
-  }
+  constructor(private name: string, private database: any) {}
 
   get() {
     return Promise.resolve(this.database.docs[this.name]);

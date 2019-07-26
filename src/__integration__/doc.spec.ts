@@ -123,30 +123,31 @@ describe('Doc integration', () => {
       db.doc(docName)
         .update(newData)
         .result.then(() => {
-        // imitate that doc is created by some other client
-        // in the same session
-        return db.doc(docName).get();
-      })
+          // imitate that doc is created by some other client
+          // in the same session
+          return db.doc(docName).get();
+        })
         .then(docData => {
           expect(docData).toEqual(newData);
           done();
         });
     });
 
-    it('should update only subset of field not overriding all of them', (done) => {
+    it('should update only subset of field not overriding all of them', done => {
       const doc = db.doc('test');
 
-      doc.update({
-        first: 'first',
-        second: 'second',
-      }).result
-        .then(() => {
+      doc
+        .update({
+          first: 'first',
+          second: 'second',
+        })
+        .result.then(() => {
           return doc.update({
             first: 'foo',
           }).result;
         })
         .then(() => doc.get())
-        .then((docData) => {
+        .then(docData => {
           expect(docData).toEqual({
             first: 'foo',
             second: 'second',
@@ -158,26 +159,33 @@ describe('Doc integration', () => {
   });
 
   describe('[onSnapshot method]', () => {
-    it('should return initial document value', (done) => {
-      db.doc('test').onSnapshot().subscribe((docSnapshot) => {
-        expect(docSnapshot).toEqual({});
-        done();
-      });
+    it('should return initial document value', done => {
+      db.doc('test')
+        .onSnapshot()
+        .subscribe(docSnapshot => {
+          expect(docSnapshot).toEqual({});
+          done();
+        });
     });
 
     it('should return updated value', () => {
       const snapshotCallback = jest.fn();
 
-      db.doc('test').onSnapshot().subscribe(snapshotCallback);
+      db.doc('test')
+        .onSnapshot()
+        .subscribe(snapshotCallback);
 
       const newData = {
         foo: 'foo',
       };
 
-      return db.doc('test').update(newData).result.then(() => {
-        expect(snapshotCallback.mock.calls.length).toEqual(2);
-        expect(snapshotCallback).toHaveBeenLastCalledWith(newData);
-      });
+      return db
+        .doc('test')
+        .update(newData)
+        .result.then(() => {
+          expect(snapshotCallback.mock.calls.length).toEqual(2);
+          expect(snapshotCallback).toHaveBeenLastCalledWith(newData);
+        });
     });
   });
 });

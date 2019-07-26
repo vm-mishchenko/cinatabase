@@ -27,8 +27,7 @@ class DocUpdateResult implements IDocUpdateResult {
   memory: Promise<any> = this.memoryPromise;
   result: Promise<any> = Promise.all([this.remotePromise, this.memoryPromise]);
 
-  constructor(private memoryPromise: Promise<any>, private remotePromise: Promise<any>) {
-  }
+  constructor(private memoryPromise: Promise<any>, private remotePromise: Promise<any>) {}
 }
 
 /**
@@ -43,8 +42,7 @@ export class Doc implements IDoc {
     private memoryStore: IMemoryDocStore,
     private remoteStore: IRemoteDocStore,
     private eventService: IMediator,
-  ) {
-  }
+  ) {}
 
   /**
    * Updates memory and remote store data.

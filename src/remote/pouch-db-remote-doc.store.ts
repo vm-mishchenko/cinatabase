@@ -3,8 +3,7 @@ import { Observable, Subject } from 'rxjs';
 import { IRemoteDocStore } from '../interfaces';
 
 export class PouchDbRemoteDocStore implements IRemoteDocStore {
-  constructor(private pouchDb: PouchDB) {
-  }
+  constructor(private pouchDb: PouchDB) {}
 
   get() {
     return Promise.resolve({});

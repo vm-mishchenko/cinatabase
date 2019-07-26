@@ -3,8 +3,7 @@ import { Observable, Subscription } from 'rxjs';
 import { IMemoryDocStore } from '../interfaces';
 
 export class AkitaMemoryDocStore implements IMemoryDocStore {
-  constructor(private store: Store<any>, private query: Query<any>) {
-  }
+  constructor(private store: Store<any>, private query: Query<any>) {}
 
   get() {
     return Promise.resolve(this.query.getValue());
@@ -17,7 +16,6 @@ export class AkitaMemoryDocStore implements IMemoryDocStore {
   }
 
   onSnapshot(): Observable<any> {
-    return this.query
-      .select(data => data);
+    return this.query.select(data => data);
   }
 }
