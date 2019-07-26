@@ -1,5 +1,5 @@
-import 'reflect-metadata';
 import { injectable } from 'inversify';
+import 'reflect-metadata';
 import { Subject } from 'rxjs';
 import { Database } from './database';
 import { Doc } from './document/doc';
@@ -19,15 +19,14 @@ class FakeMemoryStoreFactory implements IStore {
       },
 
       onSnapshot() {
-        return new Subject().subscribe(() => {
-        });
+        return new Subject();
       },
     };
   }
 
   collection(name: string): IMemoryCollectionStore {
     return {
-      add(data: any): Promise<any> {
+      add(): Promise<any> {
         return Promise.resolve();
       },
     };
