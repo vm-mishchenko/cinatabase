@@ -1,5 +1,5 @@
 export { Database } from './database';
-export { Doc, IDocUpdateResult } from './document/doc';
+export { Doc, IUpdateDocResult } from './document/doc';
 export { DocFactory, DOC_FACTORY_TOKEN } from './document/doc.factory';
 export { AkitaMemoryCollectionStore } from './memory/akita-memory-collection.store';
 export { AkitaMemoryDocStore } from './memory/akita-memory-doc.store';

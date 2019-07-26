@@ -1,4 +1,4 @@
-import { Observable, Subscription } from 'rxjs';
+import { Observable } from 'rxjs';
 
 // memory interfaces
 export interface IMemoryDocStore {

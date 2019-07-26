@@ -109,7 +109,7 @@ describe('Doc integration', () => {
 
       doc
         .update(newData)
-        .result.then(() => doc.get())
+        .then(() => doc.get())
         .then(docData => {
           expect(docData).toEqual(newData);
           done();
@@ -122,7 +122,7 @@ describe('Doc integration', () => {
 
       db.doc(docName)
         .update(newData)
-        .result.then(() => {
+        .then(() => {
           // imitate that doc is created by some other client
           // in the same session
           return db.doc(docName).get();
@@ -141,10 +141,10 @@ describe('Doc integration', () => {
           first: 'first',
           second: 'second',
         })
-        .result.then(() => {
+        .then(() => {
           return doc.update({
             first: 'foo',
-          }).result;
+          });
         })
         .then(() => doc.get())
         .then(docData => {
@@ -182,7 +182,7 @@ describe('Doc integration', () => {
       return db
         .doc('test')
         .update(newData)
-        .result.then(() => {
+        .then(() => {
           expect(snapshotCallback.mock.calls.length).toEqual(2);
           expect(snapshotCallback).toHaveBeenLastCalledWith(newData);
         });
