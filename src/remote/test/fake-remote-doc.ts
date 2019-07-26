@@ -1,12 +1,12 @@
-import { Subject } from 'rxjs';
-import { Subscription } from 'rxjs';
+import { Observable, Subject } from 'rxjs';
 import { IRemoteDocStore } from '../../interfaces';
 
 /**
  * In memory remote doc implementation for testing purpose.
  */
 export class FakeRemoteDoc implements IRemoteDocStore {
-  constructor(private name: string, private database: any) {}
+  constructor(private name: string, private database: any) {
+  }
 
   get() {
     return Promise.resolve(this.database.docs[this.name]);
@@ -21,8 +21,7 @@ export class FakeRemoteDoc implements IRemoteDocStore {
     return Promise.resolve();
   }
 
-  onSnapshot(fn: (data: any) => any): Subscription {
-    const subject = new Subject();
-    return subject.subscribe(fn);
+  onSnapshot(): Observable<any> {
+    return new Subject();
   }
 }

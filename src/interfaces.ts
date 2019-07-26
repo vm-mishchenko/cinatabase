@@ -19,7 +19,7 @@ export interface IRemoteDocStore {
 
   update(data: any): Promise<any>;
 
-  onSnapshot(fn: (data: any) => any): Subscription;
+  onSnapshot(): Observable<any>;
 }
 
 export interface IRemoteCollectionStore {

@@ -1,9 +1,10 @@
 import PouchDB from 'pouchdb';
-import { Observable, Subscription } from 'rxjs';
+import { Observable, Subject } from 'rxjs';
 import { IRemoteDocStore } from '../interfaces';
 
 export class PouchDbRemoteDocStore implements IRemoteDocStore {
-  constructor(private pouchDb: PouchDB) {}
+  constructor(private pouchDb: PouchDB) {
+  }
 
   get() {
     return Promise.resolve({});
@@ -13,9 +14,7 @@ export class PouchDbRemoteDocStore implements IRemoteDocStore {
     return Promise.resolve();
   }
 
-  onSnapshot(fn: (data: any) => any): Subscription {
-    return new Observable().subscribe(data => {
-      fn(data);
-    });
+  onSnapshot(): Observable<any> {
+    return new Subject();
   }
 }
