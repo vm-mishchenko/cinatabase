@@ -1,25 +1,7 @@
 import 'reflect-metadata';
-import { Database } from '../database';
-import { REMOTE_STORE_TOKEN } from '../remote/remote-store.factory';
-import { FakeRemoteStore } from '../remote/test/fake-remote.store';
+import { TestDatabase } from '../document/test-helpers/fake-database';
 
 // https://jestjs.io/docs/en/expect
-
-class TestDatabase extends Database {
-  constructor() {
-    const services = new Map();
-    services.set(REMOTE_STORE_TOKEN, FakeRemoteStore);
-
-    super({ services });
-  }
-
-  /**
-   * Returns internal remote storage instance.
-   */
-  getRemoteStorage(): FakeRemoteStore {
-    return this.injector.get<FakeRemoteStore>(REMOTE_STORE_TOKEN);
-  }
-}
 
 /**
  * Tests high level integrations around Doc class.

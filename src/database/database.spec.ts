@@ -1,10 +1,10 @@
-import { injectable } from 'inversify';
 import 'reflect-metadata';
+import { injectable } from 'inversify';
 import { Subject } from 'rxjs';
+import { Doc, MEMORY_STORE_TOKEN } from '..';
+import { IMemoryDocStore, IMemoryStore } from '../interfaces';
 import { Database } from './database';
-import { Doc } from './document/doc';
-import { IMemoryDocStore, IMemoryStore } from './interfaces';
-import { MEMORY_STORE_TOKEN } from './memory/memory.store';
+
 
 @injectable()
 class FakeMemoryStoreFactory implements IMemoryStore {

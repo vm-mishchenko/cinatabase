@@ -1,11 +1,17 @@
-import { Observable } from 'rxjs';
+import { BehaviorSubject, Observable } from 'rxjs';
 import { IMemoryDocStore, IRemoteDocRef } from '../interfaces';
 import { IMediator } from '../mediator';
 
 export interface IDoc {
+  deleted$: Observable<boolean>;
+
+  isDeleted(): boolean;
+
   update(data: any): IUpdateDocResult;
 
   get(): Promise<any>;
+
+  snapshot(): any;
 
   onSnapshot(): Observable<any>;
 }
@@ -55,6 +61,8 @@ class UpdateDocResult implements IUpdateDocResult {
  * Abstract for the Client memory and remote stores.
  */
 export class Doc implements IDoc {
+  deleted$: Observable<boolean> = new BehaviorSubject(false);
+
   private isSynced = false;
   private cachedGetRequest: Promise<any> = null;
   private syncPromise: Promise<any> = null;
@@ -63,7 +71,7 @@ export class Doc implements IDoc {
     private name: string,
     private memoryStore: IMemoryDocStore,
     private remoteStore: IRemoteDocRef,
-    private eventService: IMediator
+    private eventService: IMediator,
   ) {
   }
 
@@ -86,7 +94,9 @@ export class Doc implements IDoc {
       return this.cachedGetRequest;
     }
 
-    const getRequestPromise = this.isSynced ? this.memoryStore.get() : this.sync().then(() => this.memoryStore.get());
+    const getRequestPromise = this.isSynced ?
+      Promise.resolve(this.memoryStore.get()) :
+      this.sync().then(() => this.memoryStore.get());
 
     this.cachedGetRequest = getRequestPromise.finally(() => {
       this.cachedGetRequest = null;
@@ -101,6 +111,20 @@ export class Doc implements IDoc {
 
   onSnapshot(): Observable<any> {
     return this.memoryStore.onSnapshot();
+  }
+
+  snapshot() {
+    return this.memoryStore.get();
+  }
+
+  delete(): Promise<any> {
+    // make request to the pouchdb
+    (this.deleted$ as BehaviorSubject<boolean>).next(true);
+    return Promise.resolve();
+  }
+
+  isDeleted(): boolean {
+    return (this.deleted$ as BehaviorSubject<boolean>).getValue();
   }
 
   private sync(): Promise<any> {
@@ -119,7 +143,7 @@ export class Doc implements IDoc {
         () => {
           // remote store does not have data meaning it is a new doc
           // just skip that error
-        }
+        },
       )
       .finally(() => {
         this.isSynced = true;

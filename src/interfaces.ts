@@ -6,9 +6,9 @@ import { Observable } from 'rxjs';
  * Contains the logic for data storing and streaming.
  */
 export interface IMemoryDocStore {
-  get(): Promise<any>;
+  get(): any;
 
-  update(data: any): Promise<any>;
+  update(data: any): any;
 
   onSnapshot(): Observable<any>;
 }

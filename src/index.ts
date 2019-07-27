@@ -1,4 +1,4 @@
-export { Database } from './database';
+export { Database } from './database/database';
 export { Doc, IUpdateDocResult } from './document/doc';
 export { DocFactory, DOC_FACTORY_TOKEN } from './document/doc.factory';
 export { AkitaMemoryCollectionStore } from './memory/akita-memory-collection.store';
