@@ -5,8 +5,7 @@ export class PouchDbRemoteDocStore<M> implements IRemoteDocRef {
   // Represent id which is used for data storing in pouch database.
   private pouchDbId: PouchDB.Core.DocumentId = `${this.name}:${this.name}`;
 
-  constructor(private name: string, private pouchDb: PouchDB.Database) {
-  }
+  constructor(private name: string, private pouchDb: PouchDB.Database) {}
 
   /**
    * Retrieve document data from pouch database.
@@ -14,35 +13,29 @@ export class PouchDbRemoteDocStore<M> implements IRemoteDocRef {
    * It's client responsibility to handle that error.
    */
   get(): Promise<M> {
-    return this.getRawDoc().then((rawDoc) => this.extractDoc(rawDoc));
+    return this.getRawDoc().then(rawDoc => this.extractDoc(rawDoc));
   }
 
   update(partialDoc: any) {
-    return this.getRawDoc().then((rawDoc) => {
-      // doc exists already, just update it
-      return this.pouchDb.put({
-        ...rawDoc,
-        ...partialDoc
+    return this.getRawDoc()
+      .then(rawDoc => {
+        // doc exists already, just update it
+        return this.pouchDb.put({
+          ...rawDoc,
+          ...partialDoc,
+        });
+      })
+      .catch(() => {
+        // doc is not exist yet, let's create new one
+        return this.pouchDb.put(this.createNewRawDoc(partialDoc));
       });
-    }).catch(() => {
-      // doc is not exist yet, let's create new one
-      return this.pouchDb.put(this.createNewRawDoc(partialDoc));
-    });
   }
 
   /**
    * Extracts original doc removing all pouch database metadata.
    */
   private extractDoc(rawDoc: PouchDB.Core.Document<M> & PouchDB.Core.GetMeta): any {
-    const {
-      _attachments,
-      _id,
-      _revisions,
-      _rev,
-      _revs_info,
-      _conflicts,
-      ...doc
-    } = rawDoc;
+    const { _attachments, _id, _revisions, _rev, _revs_info, _conflicts, ...doc } = rawDoc;
 
     return doc;
   }
@@ -59,7 +52,7 @@ export class PouchDbRemoteDocStore<M> implements IRemoteDocRef {
   private createNewRawDoc(doc): PouchDB.Core.Document<M> & PouchDB.Core.IdMeta {
     return {
       _id: this.pouchDbId,
-      ...doc
+      ...doc,
     };
   }
 }

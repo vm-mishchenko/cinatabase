@@ -11,7 +11,7 @@ export class FakeRemoteStore implements IRemoteStore {
 
   private static database = {
     docs: {},
-    collections: {}
+    collections: {},
   };
 
   doc(name: string): IRemoteDocRef {

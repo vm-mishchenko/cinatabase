@@ -15,12 +15,34 @@ db.collection('users').doc('admin');
 // create new document
 db.collection('users').doc();
 
-// load all users from remote
-db.collection('users').onSnapshot();
+/*
+ * Use cases
+ * 1. sync documents
+ * 2. build query based on in memory documents
+ * 3. build query and fetch data from pouch-db
+ * */
 
-// show only loaded users, does not trigger additional loading
-db.collection('users').onSnapshot({ memoryOnly: true });
+// load users based on the options from pouch-db
+// @return {!Query}
+db.collection('users')
+  .sync(/*...options*/)
+  .get();
 
-// load users based on the predicate
-findPredicate = (doc) => doc;
-const usersNameView = db.collection('users').find(findPredicate);
+// load users based on the options from pouch-db
+// @return {!Query}
+const query = db
+  .collection('users')
+  .query({
+    sync: true, // before query sync documents with pouch-db
+  })
+  .get();
+
+// return all documents
+query.snapshot().then(docs => {});
+
+// listen for document changes
+// @return {DocumentData}
+query.onSnapshot();
+
+// update field for all documents in the query
+query.update({});

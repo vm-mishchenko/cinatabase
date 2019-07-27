@@ -20,7 +20,7 @@ class FakeMemoryStoreFactory implements IMemoryStore {
 
       onSnapshot() {
         return new Subject();
-      }
+      },
     };
   }
 }
@@ -50,7 +50,7 @@ describe('Database', () => {
     const doc = db.doc('test');
 
     doc.update({
-      test: 'test'
+      test: 'test',
     });
 
     expect(memoryStoreFactory.doc).toHaveBeenCalled();

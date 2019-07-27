@@ -19,8 +19,8 @@ export class MemoryStore implements IMemoryStore {
       const docStore = new Store(
         {},
         {
-          name
-        }
+          name,
+        },
       );
 
       const memoryDoc = new AkitaMemoryDocStore(docStore, new Query(docStore));
@@ -35,8 +35,8 @@ export class MemoryStore implements IMemoryStore {
     const collectionStore = new EntityStore(
       {},
       {
-        name
-      }
+        name,
+      },
     );
 
     return new AkitaMemoryCollectionStore(collectionStore, new Query(collectionStore));

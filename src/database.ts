@@ -3,8 +3,8 @@ import { Observable } from 'rxjs';
 import { IDoc } from './document/doc';
 import { DOC_FACTORY_TOKEN, DocFactory } from './document/doc.factory';
 import { IMediator, Mediator, MEDIATOR_TOKEN } from './mediator';
-import { MemoryStore, MEMORY_STORE_TOKEN } from './memory/memory.store';
-import { RemoteStoreFactory, REMOTE_STORE_TOKEN } from './remote/remote-store.factory';
+import { MEMORY_STORE_TOKEN, MemoryStore } from './memory/memory.store';
+import { REMOTE_STORE_TOKEN, RemoteStoreFactory } from './remote/remote-store.factory';
 
 export interface IDatabaseOptions {
   services?: Map<Symbol, any>;
@@ -20,7 +20,10 @@ export class Database {
   events$: Observable<any>;
   injector: Container = new Container();
 
-  private cachedDocs: Map<string, IDoc> = new Map();
+  /**
+   * Already initialized documents.
+   */
+  private docs: Map<string, IDoc> = new Map();
 
   constructor(private options: IDatabaseOptions = {}) {
     // initialize injector
@@ -50,10 +53,10 @@ export class Database {
   }
 
   doc<M>(name: string): IDoc {
-    if (!this.cachedDocs.has(name)) {
-      this.cachedDocs.set(name, this.injector.get<DocFactory>(DOC_FACTORY_TOKEN).get(name));
+    if (!this.docs.has(name)) {
+      this.docs.set(name, this.injector.get<DocFactory>(DOC_FACTORY_TOKEN).get(name));
     }
 
-    return this.cachedDocs.get(name);
+    return this.docs.get(name);
   }
 }

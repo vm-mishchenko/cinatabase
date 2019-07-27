@@ -11,10 +11,9 @@ export const DOC_FACTORY_TOKEN = Symbol.for('DOC_FACTORY_TOKEN');
 export class DocFactory {
   constructor(
     @inject(MEDIATOR_TOKEN) private eventService: IMediator,
-    @inject(REMOTE_STORE_TOKEN) private remoteStoreFactory: IMemoryStore,
-    @inject(MEMORY_STORE_TOKEN) private memoryStoreFactory: IRemoteStore
-  ) {
-  }
+    @inject(REMOTE_STORE_TOKEN) private remoteStoreFactory: IRemoteStore,
+    @inject(MEMORY_STORE_TOKEN) private memoryStoreFactory: IMemoryStore,
+  ) {}
 
   /**
    * Creates document reference.

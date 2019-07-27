@@ -11,12 +11,11 @@ export interface IDoc {
 }
 
 export interface IUpdateDocResult {
-  then(onfulfilled?: () => any | PromiseLike<any>,
-       onrejected?: (reason: any) => PromiseLike<never>): Promise<any>;
+  then(onfulfilled?: () => any | PromiseLike<any>, onrejected?: (reason: any) => PromiseLike<never>): Promise<any>;
 
   catch(onRejected?: (reason: any) => PromiseLike<never>): Promise<any>;
 
-  finally(onFinally?: () => PromiseLike<never>): Promise<any>
+  finally(onFinally?: () => PromiseLike<never>): Promise<any>;
 
   remote(): Promise<any>;
 
@@ -31,10 +30,7 @@ class UpdateDocResult implements IUpdateDocResult {
   constructor(private syncPromise: Promise<[Promise<any>, Promise<any>]>) {
   }
 
-  then(
-    onfulfilled?: () => any | PromiseLike<any>,
-    onrejected?: (reason: any) => PromiseLike<never>,
-  ): Promise<any> {
+  then(onfulfilled?: () => any | PromiseLike<any>, onrejected?: (reason: any) => PromiseLike<never>): Promise<any> {
     return this.syncPromise.then(onfulfilled, onrejected);
   }
 
@@ -59,7 +55,7 @@ class UpdateDocResult implements IUpdateDocResult {
  * Abstract for the Client memory and remote stores.
  */
 export class Doc implements IDoc {
-  private isSyncedWithRemote = false;
+  private isSynced = false;
   private cachedGetRequest: Promise<any> = null;
   private syncPromise: Promise<any> = null;
 
@@ -67,7 +63,7 @@ export class Doc implements IDoc {
     private name: string,
     private memoryStore: IMemoryDocStore,
     private remoteStore: IRemoteDocRef,
-    private eventService: IMediator,
+    private eventService: IMediator
   ) {
   }
 
@@ -78,12 +74,7 @@ export class Doc implements IDoc {
    * responsibility how to handle these challenges belongs to store implementations.
    */
   update(data: any): UpdateDocResult {
-    return new UpdateDocResult(
-      this.sync().then(() => [
-        this.memoryStore.update(data),
-        this.remoteStore.update(data),
-      ]),
-    );
+    return new UpdateDocResult(this.sync().then(() => [this.memoryStore.update(data), this.remoteStore.update(data)]));
   }
 
   /**
@@ -95,9 +86,7 @@ export class Doc implements IDoc {
       return this.cachedGetRequest;
     }
 
-    const getRequestPromise = this.isSyncedWithRemote ?
-      this.memoryStore.get() :
-      this.sync().then(() => this.memoryStore.get());
+    const getRequestPromise = this.isSynced ? this.memoryStore.get() : this.sync().then(() => this.memoryStore.get());
 
     this.cachedGetRequest = getRequestPromise.finally(() => {
       this.cachedGetRequest = null;
@@ -115,7 +104,7 @@ export class Doc implements IDoc {
   }
 
   private sync(): Promise<any> {
-    if (this.isSyncedWithRemote) {
+    if (this.isSynced) {
       return Promise.resolve();
     }
 
@@ -123,15 +112,17 @@ export class Doc implements IDoc {
       return this.syncPromise;
     }
 
-    this.syncPromise = this.remoteStore.get()
-      .then(docData => this.memoryStore.update(docData),
+    this.syncPromise = this.remoteStore
+      .get()
+      .then(
+        docData => this.memoryStore.update(docData),
         () => {
           // remote store does not have data meaning it is a new doc
           // just skip that error
-        },
+        }
       )
       .finally(() => {
-        this.isSyncedWithRemote = true;
+        this.isSynced = true;
         this.syncPromise = null;
       });
 
