@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",
-    "test": "jest --config jestconfig.json",
+    "test": "jest",
     "lint": "tslint -p tsconfig.json",
     "format": "prettier --write \"src/**/*.ts\" \"src/**/*.js\"",
     "pre-commit": "npm run lint && npm run format && npm run test",
@@ -31,6 +31,20 @@
   "files": [
     "dist/**/*"
   ],
+  "jest": {
+    "moduleFileExtensions": [
+      "ts",
+      "js"
+    ],
+    "transform": {
+      "\\.(ts)$": "ts-jest"
+    },
+    "testRegex": "/src/.*\\.spec.(ts)$",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/playground/"
+    ]
+  },
   "dependencies": {
     "inversify": "^5.0.1",
     "rxjs": "^6.5.2",
@@ -41,7 +55,7 @@
   },
   "devDependencies": {
     "@types/pouchdb": "^6.4.0",
-    "@types/jest": "24.0.9",
+    "@types/jest": "^24.0.15",
     "@types/pouchdb-find": "^6.3.4",
     "jest": "^24.8.0",
     "ts-jest": "24.0.0",

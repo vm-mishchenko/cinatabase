@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { TestDatabase } from '../document/test-helpers/fake-database';
+import { TestDatabase } from '../database/test-helpers/fake-database';
 import { Collection } from './collection';
 
 describe('Collection', () => {
@@ -31,7 +31,7 @@ describe('Collection', () => {
   });
 
   describe('[query method]', () => {
-    fit('should return docs', () => {
+    it('should return docs', () => {
       const collection = db.collection('users');
       collection.doc('demo');
 

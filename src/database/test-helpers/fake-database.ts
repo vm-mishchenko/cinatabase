@@ -1,4 +1,4 @@
-import { Database, REMOTE_STORE_TOKEN } from '../..';
+import { Database, REMOTE_STORE_TOKEN } from '../../index';
 import { FakeRemoteStore } from '../../remote/test/fake-remote.store';
 
 export class TestDatabase extends Database {

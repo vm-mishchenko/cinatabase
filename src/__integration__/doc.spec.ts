@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { TestDatabase } from '../document/test-helpers/fake-database';
+import { TestDatabase } from '../database/test-helpers/fake-database';
 
 // https://jestjs.io/docs/en/expect
 
