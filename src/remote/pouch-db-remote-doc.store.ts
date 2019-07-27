@@ -1,8 +1,7 @@
 import PouchDB from 'pouchdb';
-import { Observable, Subject } from 'rxjs';
-import { IRemoteDocStore } from '../interfaces';
+import { IRemoteDocRef } from '../interfaces';
 
-export class PouchDbRemoteDocStore<M> implements IRemoteDocStore {
+export class PouchDbRemoteDocStore<M> implements IRemoteDocRef {
   // Represent id which is used for data storing in pouch database.
   private pouchDbId: PouchDB.Core.DocumentId = `${this.name}:${this.name}`;
 
@@ -23,16 +22,12 @@ export class PouchDbRemoteDocStore<M> implements IRemoteDocStore {
       // doc exists already, just update it
       return this.pouchDb.put({
         ...rawDoc,
-        ...partialDoc,
+        ...partialDoc
       });
     }).catch(() => {
       // doc is not exist yet, let's create new one
       return this.pouchDb.put(this.createNewRawDoc(partialDoc));
     });
-  }
-
-  onSnapshot(): Observable<any> {
-    return new Subject();
   }
 
   /**
@@ -64,7 +59,7 @@ export class PouchDbRemoteDocStore<M> implements IRemoteDocStore {
   private createNewRawDoc(doc): PouchDB.Core.Document<M> & PouchDB.Core.IdMeta {
     return {
       _id: this.pouchDbId,
-      ...doc,
+      ...doc
     };
   }
 }

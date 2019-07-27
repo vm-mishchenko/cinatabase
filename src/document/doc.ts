@@ -1,5 +1,5 @@
 import { Observable } from 'rxjs';
-import { IMemoryDocStore, IRemoteDocStore } from '../interfaces';
+import { IMemoryDocStore, IRemoteDocRef } from '../interfaces';
 import { IMediator } from '../mediator';
 
 export interface IDoc {
@@ -66,7 +66,7 @@ export class Doc implements IDoc {
   constructor(
     private name: string,
     private memoryStore: IMemoryDocStore,
-    private remoteStore: IRemoteDocStore,
+    private remoteStore: IRemoteDocRef,
     private eventService: IMediator,
   ) {
   }

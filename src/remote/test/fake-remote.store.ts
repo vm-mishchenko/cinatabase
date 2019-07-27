@@ -1,9 +1,9 @@
 import { injectable } from 'inversify';
-import { IRemoteCollectionStore, IRemoteDocStore, IStore } from '../../interfaces';
+import { IRemoteDocRef, IRemoteStore } from '../../interfaces';
 import { FakeRemoteDoc } from './fake-remote-doc';
 
 @injectable()
-export class FakeRemoteStore implements IStore {
+export class FakeRemoteStore implements IRemoteStore {
   static clearDatabase = () => {
     FakeRemoteStore.database.docs = {};
     FakeRemoteStore.database.collections = {};
@@ -11,19 +11,11 @@ export class FakeRemoteStore implements IStore {
 
   private static database = {
     docs: {},
-    collections: {},
+    collections: {}
   };
 
-  doc(name: string): IRemoteDocStore {
+  doc(name: string): IRemoteDocRef {
     return new FakeRemoteDoc(name, FakeRemoteStore.database);
-  }
-
-  collection(name: string): IRemoteCollectionStore {
-    return {
-      add(data: any): Promise<any> {
-        return Promise.resolve();
-      },
-    };
   }
 
   docsCount(): number {

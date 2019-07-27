@@ -1,6 +1,10 @@
 import { Observable } from 'rxjs';
 
 // memory interfaces
+/**
+ * Represents the storage for storing Document Data.
+ * Contains the logic for data storing and streaming.
+ */
 export interface IMemoryDocStore {
   get(): Promise<any>;
 
@@ -14,12 +18,14 @@ export interface IMemoryCollectionStore {
 }
 
 // remote interfaces
-export interface IRemoteDocStore {
+/**
+ * Represents Remote Storage Doc./
+ * Abstraction over the remote store for particular document instance.
+ */
+export interface IRemoteDocRef {
   get(): Promise<any>;
 
   update(data: any): Promise<any>;
-
-  onSnapshot(): Observable<any>;
 }
 
 export interface IRemoteCollectionStore {
@@ -27,10 +33,15 @@ export interface IRemoteCollectionStore {
 }
 
 /**
- * Remote and Memory stores should implement the same interface.
+ * Represents Memory Database
  */
-export interface IStore {
+export interface IMemoryStore {
   doc(name: string): IMemoryDocStore;
+}
 
-  collection(name: string): IMemoryCollectionStore;
+/**
+ * Represents Remote Database
+ */
+export interface IRemoteStore {
+  doc(name: string): IRemoteDocRef;
 }

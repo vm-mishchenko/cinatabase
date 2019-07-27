@@ -1,5 +1,5 @@
 import { inject, injectable } from 'inversify';
-import { IStore } from '../interfaces';
+import { IMemoryStore, IRemoteStore } from '../interfaces';
 import { IMediator, MEDIATOR_TOKEN } from '../mediator';
 import { MEMORY_STORE_TOKEN } from '../memory/memory.store';
 import { REMOTE_STORE_TOKEN } from '../remote/remote-store.factory';
@@ -11,9 +11,10 @@ export const DOC_FACTORY_TOKEN = Symbol.for('DOC_FACTORY_TOKEN');
 export class DocFactory {
   constructor(
     @inject(MEDIATOR_TOKEN) private eventService: IMediator,
-    @inject(REMOTE_STORE_TOKEN) private remoteStoreFactory: IStore,
-    @inject(MEMORY_STORE_TOKEN) private memoryStoreFactory: IStore,
-  ) {}
+    @inject(REMOTE_STORE_TOKEN) private remoteStoreFactory: IMemoryStore,
+    @inject(MEMORY_STORE_TOKEN) private memoryStoreFactory: IRemoteStore
+  ) {
+  }
 
   /**
    * Creates document reference.

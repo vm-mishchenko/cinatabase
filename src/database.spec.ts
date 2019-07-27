@@ -3,11 +3,11 @@ import 'reflect-metadata';
 import { Subject } from 'rxjs';
 import { Database } from './database';
 import { Doc } from './document/doc';
-import { IMemoryCollectionStore, IMemoryDocStore, IStore } from './interfaces';
+import { IMemoryDocStore, IMemoryStore } from './interfaces';
 import { MEMORY_STORE_TOKEN } from './memory/memory.store';
 
 @injectable()
-class FakeMemoryStoreFactory implements IStore {
+class FakeMemoryStoreFactory implements IMemoryStore {
   doc(name: string): IMemoryDocStore {
     return {
       update: (): Promise<any> => {
@@ -20,15 +20,7 @@ class FakeMemoryStoreFactory implements IStore {
 
       onSnapshot() {
         return new Subject();
-      },
-    };
-  }
-
-  collection(name: string): IMemoryCollectionStore {
-    return {
-      add(): Promise<any> {
-        return Promise.resolve();
-      },
+      }
     };
   }
 }
@@ -51,14 +43,14 @@ describe('Database', () => {
 
     const db = new Database({ services });
 
-    const memoryStoreFactory = db.injector.get<IStore>(MEMORY_STORE_TOKEN);
+    const memoryStoreFactory = db.injector.get<IMemoryStore>(MEMORY_STORE_TOKEN);
 
     spyOn(memoryStoreFactory, 'doc').and.callThrough();
 
     const doc = db.doc('test');
 
     doc.update({
-      test: 'test',
+      test: 'test'
     });
 
     expect(memoryStoreFactory.doc).toHaveBeenCalled();

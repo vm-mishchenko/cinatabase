@@ -1,8 +1,7 @@
 import { injectable } from 'inversify';
 import PouchDB from 'pouchdb';
 import PouchFind from 'pouchdb-find';
-import { IMemoryCollectionStore, IRemoteDocStore, IStore } from '../interfaces';
-import { PouchDbRemoteCollectionStore } from './pouch-db-remote-collection.store';
+import { IRemoteDocRef, IRemoteStore } from '../interfaces';
 import { PouchDbRemoteDocStore } from './pouch-db-remote-doc.store';
 
 PouchDB.plugin(PouchFind);
@@ -12,19 +11,15 @@ const POUCH_STORAGE_LOCAL_DB_NAME_KEY = 'pouchdb-storage:local-database-name';
 export const REMOTE_STORE_TOKEN = Symbol.for('REMOTE_STORE_TOKEN');
 
 @injectable()
-export class RemoteStoreFactory implements IStore {
+export class RemoteStoreFactory implements IRemoteStore {
   database: PouchDB.Database;
 
   constructor() {
     this.initializeDatabase();
   }
 
-  doc<M>(name: string): IRemoteDocStore {
+  doc<M>(name: string): IRemoteDocRef {
     return new PouchDbRemoteDocStore<M>(name, this.database);
-  }
-
-  collection(name: string): IMemoryCollectionStore {
-    return new PouchDbRemoteCollectionStore();
   }
 
   private initializeDatabase() {
