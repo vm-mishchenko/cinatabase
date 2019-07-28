@@ -1,7 +1,7 @@
 import { injectable } from 'inversify';
 import PouchDB from 'pouchdb';
 import PouchFind from 'pouchdb-find';
-import { IRemoteDocRef, IRemoteStore } from '../interfaces';
+import { IRemoteDocRef, IRemoteDocData, IRemoteStore } from '../interfaces';
 import { PouchDbRemoteDocStore } from './pouch-db-remote-doc.store';
 
 PouchDB.plugin(PouchFind);
@@ -10,9 +10,19 @@ const POUCH_STORAGE_LOCAL_DB_NAME_KEY = 'pouchdb-storage:local-database-name';
 
 export const REMOTE_STORE_TOKEN = Symbol.for('REMOTE_STORE_TOKEN');
 
+export interface IdMeta {
+  _id: string
+}
+
+interface IPouchDBDocument {
+  _id: string;
+}
+
+// type IPouchDBDocument = IdMeta & Object;
+
 @injectable()
 export class RemoteStoreFactory implements IRemoteStore {
-  database: PouchDB.Database;
+  private database: PouchDB.Database;
 
   constructor() {
     this.initializeDatabase();
@@ -20,6 +30,16 @@ export class RemoteStoreFactory implements IRemoteStore {
 
   doc<M>(name: string): IRemoteDocRef {
     return new PouchDbRemoteDocStore<M>(name, this.database);
+  }
+
+  /**
+   * Most general interface for pouch-db search.
+   */
+  find(options): Promise<IRemoteDocData[]> {
+    return this.database.find(options).then((entities) => {
+      // todo: should clean up pouch-db specific data
+      return entities as any;
+    });
   }
 
   private initializeDatabase() {

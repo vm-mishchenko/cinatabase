@@ -17,13 +17,17 @@ export interface IMemoryCollectionStore {
   add(data: any): Promise<any>;
 }
 
+export interface IRemoteDocData extends Object {
+  _id: string;
+}
+
 // remote interfaces
 /**
  * Represents Remote Storage Doc./
  * Abstraction over the remote store for particular document instance.
  */
 export interface IRemoteDocRef {
-  get(): Promise<any>;
+  get(): Promise<IRemoteDocData>;
 
   update(data: any): Promise<any>;
 }
@@ -44,4 +48,6 @@ export interface IMemoryStore {
  */
 export interface IRemoteStore {
   doc(name: string): IRemoteDocRef;
+
+  find(options: any): Promise<IRemoteDocData[]>;
 }

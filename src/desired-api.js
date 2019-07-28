@@ -26,7 +26,7 @@ db.collection('users').doc();
 // @return {!Query}
 db.collection('users')
   .sync(/*...options*/)
-  .get();
+  .exec();
 
 // creates query object, does not perform any action yet
 // @return {!Query}

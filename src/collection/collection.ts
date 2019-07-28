@@ -2,6 +2,7 @@ import { BehaviorSubject, Observable } from 'rxjs';
 import { map, takeUntil } from 'rxjs/operators';
 import { IDoc } from '../document/doc';
 import { IDocFactory } from '../document/doc.factory';
+import { IRemoteStore } from '../interfaces';
 
 /**
  * Document data (for use with `DocumentReference.set()`) consists of fields
@@ -53,6 +54,31 @@ export interface ICollection {
 
   // todo: add interface
   query(): Query;
+
+  sync(options: any): Sync;
+}
+
+/**
+ * Load document data from the pouch-db.
+ * Knows how to construct request query to based on the options.
+ * Operates on document data level not in IDoc level.
+ */
+export class Sync {
+  constructor(private internalCollection: InternalCollection,
+              private remoteStore: IRemoteStore,
+              private  options: any) {
+  }
+
+  // execute synchronization
+  exec(): Promise<any> {
+    return this.remoteStore.find({}).then((docsData) => {
+      docsData.forEach((docData) => {
+        const { _id, ...data } = docData;
+
+        this.internalCollection.addSyncedDoc(_id, data);
+      });
+    });
+  }
 }
 
 // todo: add interface
@@ -76,47 +102,45 @@ export class Query {
   }
 }
 
-//
 export class InternalCollection {
   // already initialized documents
-  docs: Map<string, IDoc> = new Map();
-  docs$: Observable<Map<string, IDoc>> = new BehaviorSubject<Map<string, IDoc>>(new Map());
+  private docs: Map<string, IDoc> = new Map();
+  private docs$: Observable<Map<string, IDoc>> = new BehaviorSubject<Map<string, IDoc>>(new Map());
 
   constructor(
     private name: string,
-    private docFactory: IDocFactory) {
+    private docFactory: IDocFactory,
+    private remoteStore: IRemoteStore) {
   }
 
-  doc(name): IDoc {
-    if (!this.docs.has(name)) {
-      const doc = this.docFactory.get(name);
+  id(): string {
+    return this.name;
+  }
 
-      doc.onSnapshot().pipe(
-        takeUntil(doc.deleted$),
-      ).subscribe(
-        () => {
-          console.log(`doc updated`);
-        },
-        () => {
-          // do nothing
-        },
-        () => {
-          console.log(`doc was deleted`);
-        },
-      );
-
-      this.docs.set(name, doc);
-      (this.docs$ as BehaviorSubject<Map<string, IDoc>>).next(this.docs);
+  // instantiate new or return existence doc
+  // newly doc would not be stored in pouch-db until set/update call
+  doc(id): IDoc {
+    if (!this.docs.has(id)) {
+      this.registerDoc(this.docFactory.get(id));
     }
 
-    return this.docs.get(name);
+    return this.docs.get(id);
+  }
+
+  addSyncedDoc(id: string, data: any) {
+    if (!this.docs.has(id)) {
+      this.registerDoc(this.docFactory.get(id, data));
+    }
   }
 
   // in memory only so far
   query() {
-    // todo: in future create QueryFactory which
-    //  should be injected in Collection
+    // todo: in future create QueryFactory which  should be injected in Collection
     return new Query(this);
+  }
+
+  sync(options: any): Sync {
+    return new Sync(this, this.remoteStore, options);
   }
 
   snapshot(): Map<string, IDoc> {
@@ -125,6 +149,25 @@ export class InternalCollection {
 
   onSnapshot(): Observable<Map<string, IDoc>> {
     return this.docs$;
+  }
+
+  private registerDoc(doc: IDoc) {
+    doc.onSnapshot().pipe(
+      takeUntil(doc.deleted$),
+    ).subscribe(
+      () => {
+        console.log(`doc updated`);
+      },
+      () => {
+        // do nothing
+      },
+      () => {
+        console.log(`doc was deleted`);
+      },
+    );
+
+    this.docs.set(doc.id, doc);
+    (this.docs$ as BehaviorSubject<Map<string, IDoc>>).next(this.docs);
   }
 }
 
@@ -136,6 +179,11 @@ export class Collection implements ICollection {
 
   doc(name): IDoc {
     return this.internalCollection.doc(name);
+  }
+
+  // sync data with the pouch-db
+  sync(options: any): Sync {
+    return this.internalCollection.sync(options);
   }
 
   // in memory only so far

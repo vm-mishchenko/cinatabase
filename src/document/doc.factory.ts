@@ -8,7 +8,7 @@ import { Doc, IDoc } from './doc';
 export const DOC_FACTORY_TOKEN = Symbol.for('DOC_FACTORY_TOKEN');
 
 export interface IDocFactory {
-  get(name): IDoc;
+  get(name: string, docData?: any): IDoc;
 }
 
 @injectable()
@@ -23,7 +23,13 @@ export class DocFactory {
   /**
    * Creates document reference.
    */
-  get(name: string): IDoc {
-    return new Doc(name, this.memoryStoreFactory.doc(name), this.remoteStoreFactory.doc(name), this.eventService);
+  get(id: string, docData?: any): IDoc {
+    return new Doc(
+      id,
+      this.memoryStoreFactory.doc(id),
+      this.remoteStoreFactory.doc(id),
+      this.eventService,
+      docData,
+    );
   }
 }

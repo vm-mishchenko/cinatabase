@@ -2,7 +2,19 @@ import { BehaviorSubject, Observable } from 'rxjs';
 import { IMemoryDocStore, IRemoteDocRef } from '../interfaces';
 import { IMediator } from '../mediator';
 
+export interface IDocSnapshot {
+  id: string;
+
+  // returns field's value
+  field(fieldName: string): any;
+
+  // return all document data
+  toJSON(): any;
+}
+
 export interface IDoc {
+  id: string;
+
   deleted$: Observable<boolean>;
 
   isDeleted(): boolean;
@@ -14,6 +26,8 @@ export interface IDoc {
   snapshot(): any;
 
   onSnapshot(): Observable<any>;
+
+  isSynced(): boolean;
 }
 
 export interface IUpdateDocResult {
@@ -57,22 +71,40 @@ class UpdateDocResult implements IUpdateDocResult {
   }
 }
 
+export class DocSnapshot implements IDocSnapshot {
+  constructor(public id: string, private data: any) {
+  }
+
+  field(fieldName: string) {
+    return this.data[fieldName];
+  }
+
+  toJSON() {
+    return this.data;
+  }
+}
+
 /**
  * Abstract for the Client memory and remote stores.
  */
 export class Doc implements IDoc {
   deleted$: Observable<boolean> = new BehaviorSubject(false);
 
-  private isSynced = false;
+  private synced = false;
   private cachedGetRequest: Promise<any> = null;
   private syncPromise: Promise<any> = null;
 
   constructor(
-    private name: string,
+    public id: string,
     private memoryStore: IMemoryDocStore,
     private remoteStore: IRemoteDocRef,
     private eventService: IMediator,
+    remoteDocData: any,
   ) {
+    if (remoteDocData) {
+      this.memoryStore.update(remoteDocData);
+      this.synced = true;
+    }
   }
 
   /**
@@ -82,7 +114,12 @@ export class Doc implements IDoc {
    * responsibility how to handle these challenges belongs to store implementations.
    */
   update(data: any): UpdateDocResult {
-    return new UpdateDocResult(this.sync().then(() => [this.memoryStore.update(data), this.remoteStore.update(data)]));
+    return new UpdateDocResult(
+      this.sync().then(() => [
+        this.memoryStore.update(data),
+        this.remoteStore.update(data),
+      ]),
+    );
   }
 
   /**
@@ -94,7 +131,7 @@ export class Doc implements IDoc {
       return this.cachedGetRequest;
     }
 
-    const getRequestPromise = this.isSynced ?
+    const getRequestPromise = this.synced ?
       Promise.resolve(this.memoryStore.get()) :
       this.sync().then(() => this.memoryStore.get());
 
@@ -106,7 +143,7 @@ export class Doc implements IDoc {
   }
 
   toString() {
-    return `${this.name} document`;
+    return `${this.id} document`;
   }
 
   onSnapshot(): Observable<any> {
@@ -127,8 +164,12 @@ export class Doc implements IDoc {
     return (this.deleted$ as BehaviorSubject<boolean>).getValue();
   }
 
+  isSynced(): boolean {
+    return this.synced;
+  }
+
   private sync(): Promise<any> {
-    if (this.isSynced) {
+    if (this.synced) {
       return Promise.resolve();
     }
 
@@ -138,15 +179,16 @@ export class Doc implements IDoc {
 
     this.syncPromise = this.remoteStore
       .get()
-      .then(
-        docData => this.memoryStore.update(docData),
+      .then((docData) => {
+          return this.memoryStore.update(docData);
+        },
         () => {
           // remote store does not have data meaning it is a new doc
           // just skip that error
         },
       )
       .finally(() => {
-        this.isSynced = true;
+        this.synced = true;
         this.syncPromise = null;
       });
 

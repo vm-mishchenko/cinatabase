@@ -31,13 +31,18 @@ describe('Collection', () => {
   });
 
   describe('[query method]', () => {
-    it('should return docs', () => {
+    it('should return all docs', () => {
       const collection = db.collection('users');
-      collection.doc('demo');
+      const docData = { test: 'foo' };
 
-      const query = collection.query();
-      query.onSnapshot().subscribe((docs) => {
-        console.log(docs);
+      return collection.doc('demo').update(docData).then(() => {
+        const query = collection.query();
+        return query.onSnapshot().subscribe((docs) => {
+          console.log(docs);
+          expect(docs instanceof Map);
+          expect(docs.size).toEqual(1);
+          expect(docs.get('demo')).toEqual(docData);
+        });
       });
     });
   });
