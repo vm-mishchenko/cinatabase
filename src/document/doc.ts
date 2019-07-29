@@ -5,6 +5,8 @@ import { IMediator } from '../mediator';
 export interface IDocSnapshot {
   id: string;
 
+  exists: boolean;
+
   // returns field's value
   field(fieldName: string): any;
 
@@ -19,15 +21,11 @@ export interface IDoc {
 
   isDeleted(): boolean;
 
-  update(data: any): IUpdateDocResult;
+  update(data: any): Promise<any>;
 
-  get(): Promise<any>;
+  get(): Promise<IDocSnapshot>;
 
-  snapshot(): any;
-
-  onSnapshot(): Observable<any>;
-
-  isSynced(): boolean;
+  onSnapshot(fn: (docSnapshot: IDocSnapshot) => void): void;
 }
 
 export interface IUpdateDocResult {
@@ -72,7 +70,13 @@ class UpdateDocResult implements IUpdateDocResult {
 }
 
 export class DocSnapshot implements IDocSnapshot {
+  exists = true;
+
   constructor(public id: string, private data: any) {
+    if (!this.data) {
+      // means that document does not exist on server
+      this.exists = false;
+    }
   }
 
   field(fieldName: string) {
@@ -90,9 +94,11 @@ export class DocSnapshot implements IDocSnapshot {
 export class Doc implements IDoc {
   deleted$: Observable<boolean> = new BehaviorSubject(false);
 
-  private synced = false;
   private cachedGetRequest: Promise<any> = null;
   private syncPromise: Promise<any> = null;
+
+  private docSnapshot: IDocSnapshot = null;
+  private docSnapshot$: Observable<IDocSnapshot> = new BehaviorSubject(this.docSnapshot);
 
   constructor(
     public id: string,
@@ -103,7 +109,6 @@ export class Doc implements IDoc {
   ) {
     if (remoteDocData) {
       this.memoryStore.update(remoteDocData);
-      this.synced = true;
     }
   }
 
@@ -113,27 +118,35 @@ export class Doc implements IDoc {
    * Since both Remote and Memory stores are abstract for Doc class
    * responsibility how to handle these challenges belongs to store implementations.
    */
-  update(data: any): UpdateDocResult {
-    return new UpdateDocResult(
-      this.sync().then(() => [
-        this.memoryStore.update(data),
-        this.remoteStore.update(data),
-      ]),
-    );
+  update(data: any): Promise<any> {
+    return this.initSnapshot().then(() => {
+      if (!this.docSnapshot.exists) {
+        return Promise.reject();
+      }
+
+      return this.remoteStore.update(data).then(() => {
+        this.docSnapshot = new DocSnapshot(this.id, {
+          ...this.docSnapshot.toJSON(),
+          ...data,
+        });
+
+        this.notifySnapshot();
+      });
+    });
   }
 
   /**
    * Returns pre-cached data from the memory store if exists
    * or fetches it from remote if does not.
    */
-  get(): Promise<any> {
+  get(): Promise<IDocSnapshot> {
     if (this.cachedGetRequest) {
       return this.cachedGetRequest;
     }
 
-    const getRequestPromise = this.synced ?
-      Promise.resolve(this.memoryStore.get()) :
-      this.sync().then(() => this.memoryStore.get());
+    const getRequestPromise = this.docSnapshot ?
+      Promise.resolve(this.docSnapshot) :
+      this.initSnapshot().then(() => this.docSnapshot);
 
     this.cachedGetRequest = getRequestPromise.finally(() => {
       this.cachedGetRequest = null;
@@ -146,12 +159,10 @@ export class Doc implements IDoc {
     return `${this.id} document`;
   }
 
-  onSnapshot(): Observable<any> {
-    return this.memoryStore.onSnapshot();
-  }
-
-  snapshot() {
-    return this.memoryStore.get();
+  onSnapshot(fn: (docSnapshot: IDocSnapshot) => void) {
+    this.initSnapshot().then(() => {
+      this.docSnapshot$.subscribe(fn);
+    });
   }
 
   delete(): Promise<any> {
@@ -164,12 +175,16 @@ export class Doc implements IDoc {
     return (this.deleted$ as BehaviorSubject<boolean>).getValue();
   }
 
-  isSynced(): boolean {
-    return this.synced;
+  private notifySnapshot() {
+    if (!this.docSnapshot$) {
+      this.docSnapshot$ = new BehaviorSubject(this.docSnapshot);
+    } else {
+      (this.docSnapshot$ as BehaviorSubject<IDocSnapshot>).next(this.docSnapshot);
+    }
   }
 
-  private sync(): Promise<any> {
-    if (this.synced) {
+  private initSnapshot(): Promise<any> {
+    if (this.docSnapshot) {
       return Promise.resolve();
     }
 
@@ -180,15 +195,17 @@ export class Doc implements IDoc {
     this.syncPromise = this.remoteStore
       .get()
       .then((docData) => {
-          return this.memoryStore.update(docData);
+          // document already exists
+          const { _id, ...data } = docData;
+          this.docSnapshot = new DocSnapshot(_id, data);
         },
         () => {
-          // remote store does not have data meaning it is a new doc
-          // just skip that error
+          // document is not exists
+          this.docSnapshot = new DocSnapshot(this.id, undefined);
         },
       )
       .finally(() => {
-        this.synced = true;
+        this.notifySnapshot();
         this.syncPromise = null;
       });
 

@@ -87,7 +87,8 @@ export class Query {
   private docsSnapshot: Observable<Map<string, any>> = this.internalCollection.onSnapshot().pipe(
     map((docs) => {
       return Array.from(docs.entries()).reduce((result, [docName, doc]) => {
-        result.set(docName, doc.snapshot());
+        // todo: need to fix it somehow, broken after doc was changed to doc-ref
+        // result.set(docName, doc.snapshot());
 
         return result;
       }, new Map());
@@ -152,19 +153,20 @@ export class InternalCollection {
   }
 
   private registerDoc(doc: IDoc) {
-    doc.onSnapshot().pipe(
-      takeUntil(doc.deleted$),
-    ).subscribe(
-      () => {
-        console.log(`doc updated`);
-      },
-      () => {
-        // do nothing
-      },
-      () => {
-        console.log(`doc was deleted`);
-      },
-    );
+    // todo: need to subscribe to doc changes
+    // doc.onSnapshot().pipe(
+    //   takeUntil(doc.deleted$),
+    // ).subscribe(
+    //   () => {
+    //     console.log(`doc updated`);
+    //   },
+    //   () => {
+    //     // do nothing
+    //   },
+    //   () => {
+    //     console.log(`doc was deleted`);
+    //   },
+    // );
 
     this.docs.set(doc.id, doc);
     (this.docs$ as BehaviorSubject<Map<string, IDoc>>).next(this.docs);

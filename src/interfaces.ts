@@ -19,6 +19,8 @@ export interface IMemoryCollectionStore {
 
 export interface IRemoteDocData extends Object {
   _id: string;
+
+  [others: string]: any;
 }
 
 // remote interfaces

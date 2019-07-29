@@ -1,5 +1,7 @@
 import 'reflect-metadata';
 import { TestDatabase } from '../database/test-helpers/fake-database';
+import { DocSnapshot } from '../document/doc';
+import { IRemoteDocData } from '../interfaces';
 
 // https://jestjs.io/docs/en/expect
 
@@ -81,44 +83,86 @@ describe('Doc integration', () => {
             });
         });
     });
+
+    it('should return document snapshot instance', () => {
+      return db.doc('test').get().then((documentSnapshot) => {
+        expect(documentSnapshot instanceof DocSnapshot).toBe(true);
+      });
+    });
+
+    it('should return non existing doc snapshot', () => {
+      return db.doc('test').get().then((documentSnapshot) => {
+        expect(documentSnapshot.exists).toBe(false);
+        expect(documentSnapshot.id).toBe('test');
+        expect(documentSnapshot.toJSON()).toBe(undefined);
+      });
+    });
+
+    it('should return existing doc snapshot', () => {
+      const data: IRemoteDocData = {
+        _id: 'test',
+        foo: 'foo',
+      };
+
+      const remoteGetResult = Promise.resolve(data);
+      const fakeRemoteDoc = {
+        get: jasmine.createSpy('remoteDoc.get').and.returnValue(remoteGetResult),
+      };
+
+      spyOn(db.getRemoteStorage(), 'doc').and.returnValue(fakeRemoteDoc);
+
+      return db.doc('test').get().then((documentSnapshot) => {
+        expect(documentSnapshot.exists).toBe(true);
+        expect(documentSnapshot.id).toBe('test');
+        expect(documentSnapshot.toJSON()).toEqual({
+          foo: 'foo',
+        });
+      });
+    });
   });
 
   describe('[update method]', () => {
-    it('should return previously updated value for the same doc', done => {
-      const docName = 'test';
-      const newData = { foo: 'foo' };
-      const doc = db.doc(docName);
-
-      doc
-        .update(newData)
-        .then(() => doc.get())
-        .then(docData => {
-          expect(docData).toEqual(newData);
-          done();
-        });
+    it('should return error for non-existing doc', (done) => {
+      db.doc('test').update({}).catch(() => {
+        done();
+      });
     });
 
-    it('should return previously updated value for recreated doc', done => {
-      const docName = 'test';
+    it('should update and read doc data', () => {
+      // add doc to remote database
+      db.getRemoteStorage().addDoc('test', {});
+
       const newData = { foo: 'foo' };
-
-      db.doc(docName)
-        .update(newData)
-        .then(() => {
-          // imitate that doc is created by some other client
-          // in the same session
-          return db.doc(docName).get();
-        })
-        .then(docData => {
-          expect(docData).toEqual(newData);
-          done();
-        });
-    });
-
-    it('should update only subset of field not overriding all of them', done => {
       const doc = db.doc('test');
 
-      doc
+      return doc
+        .update(newData)
+        .then(() => doc.get())
+        .then((docSnapshot) => {
+          expect(docSnapshot.toJSON()).toEqual(newData);
+        });
+    });
+
+    it('should return previously updated value for recreated doc', () => {
+      // add doc to remote database
+      db.getRemoteStorage().addDoc('test', {});
+
+      const newData = { foo: 'foo' };
+
+      return db.doc('test')
+        .update(newData)
+        .then(() => db.doc('test').get())
+        .then((docSnapshot) => {
+          expect(docSnapshot.toJSON()).toEqual(newData);
+        });
+    });
+
+    it('should update only subset of field not overriding all of them', () => {
+      db.getRemoteStorage().addDoc('test', {});
+
+      const doc = db.doc('test');
+
+      return doc
         .update({
           first: 'first',
           second: 'second',
@@ -129,44 +173,70 @@ describe('Doc integration', () => {
           });
         })
         .then(() => doc.get())
-        .then(docData => {
-          expect(docData).toEqual({
+        .then((docSnapshot) => {
+          expect(docSnapshot.toJSON()).toEqual({
             first: 'foo',
             second: 'second',
           });
-
-          done();
         });
     });
   });
 
   describe('[onSnapshot method]', () => {
-    it('should return initial document value', done => {
-      db.doc('test')
-        .onSnapshot()
-        .subscribe(docSnapshot => {
-          expect(docSnapshot).toEqual({});
-          done();
+    it('should return doc snapshot instance', () => {
+      return db.doc('test')
+        .onSnapshot((docSnapshot) => {
+          expect(docSnapshot instanceof DocSnapshot).toBe(true);
+        });
+    });
+
+    it('should return non-existing doc snapshot', () => {
+      return db.doc('test')
+        .onSnapshot((docSnapshot) => {
+          expect(docSnapshot.exists).toBe(false);
+        });
+    });
+
+    it('should return existing doc snapshot', () => {
+      // add doc to remote database
+      const docData = { foo: 'foo' };
+      db.getRemoteStorage().addDoc('test', docData);
+
+      return db.doc('test')
+        .onSnapshot((docSnapshot) => {
+          expect(docSnapshot.exists).toEqual(true);
+          expect(docSnapshot.toJSON()).toEqual(docData);
         });
     });
 
     it('should return updated value', () => {
+      // add doc to remote database
+      const initialData = {
+        foo: 'foo',
+      };
+      db.getRemoteStorage().addDoc('test', initialData);
       const snapshotCallback = jest.fn();
 
       db.doc('test')
-        .onSnapshot()
-        .subscribe(snapshotCallback);
+        .onSnapshot(snapshotCallback);
 
-      const newData = {
+      const updatedData = {
         foo: 'foo',
       };
 
       return db
         .doc('test')
-        .update(newData)
+        .update(updatedData)
         .then(() => {
           expect(snapshotCallback.mock.calls.length).toEqual(2);
-          expect(snapshotCallback).toHaveBeenLastCalledWith(newData);
+
+          const initialSnapshot = snapshotCallback.mock.calls[0][0];
+          const updatedSnapshot = snapshotCallback.mock.calls[1][0];
+
+          expect(initialSnapshot instanceof DocSnapshot).toBe(true);
+          expect(updatedSnapshot instanceof DocSnapshot).toBe(true);
+          expect(initialSnapshot.toJSON()).toEqual(initialData);
+          expect(updatedSnapshot.toJSON()).toEqual(updatedData);
         });
     });
   });
