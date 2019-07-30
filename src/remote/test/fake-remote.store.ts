@@ -1,6 +1,6 @@
-import { injectable } from 'inversify';
-import { IRemoteDocData, IRemoteDocRef, IRemoteStore } from '../../interfaces';
-import { FakeRemoteDoc } from './fake-remote-doc';
+import {injectable} from 'inversify';
+import {IRemoteDocData, IRemoteDocRef, IRemoteStore} from '../../interfaces';
+import {FakeRemoteDoc} from './fake-remote-doc';
 
 @injectable()
 export class FakeRemoteStore implements IRemoteStore {
@@ -21,6 +21,7 @@ export class FakeRemoteStore implements IRemoteStore {
   find(options: any): Promise<IRemoteDocData[]> {
     return Promise.resolve([]);
   }
+
 
   addDoc(id, data) {
     FakeRemoteStore.database.docs[id] = {

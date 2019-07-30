@@ -1,7 +1,7 @@
 import 'reflect-metadata';
-import { TestDatabase } from '../database/test-helpers/fake-database';
-import { DocSnapshot } from '../document/doc';
-import { IRemoteDocData } from '../interfaces';
+import {TestDatabase} from '../database/test-helpers/fake-database';
+import {DocSnapshot} from '../document/doc';
+import {IRemoteDocData} from '../interfaces';
 
 // https://jestjs.io/docs/en/expect
 
@@ -21,7 +21,7 @@ describe('Doc integration', () => {
 
   describe('[get method]', () => {
     it('should read from remote store initially', done => {
-      const remoteGetResult = Promise.resolve({ remote: true });
+      const remoteGetResult = Promise.resolve({remote: true});
       const fakeRemoteDoc = {
         get: jasmine.createSpy('remoteDoc.get').and.returnValue(remoteGetResult),
       };
@@ -45,7 +45,7 @@ describe('Doc integration', () => {
     });
 
     it('should read remote store once for few doc get request', done => {
-      const remoteGetResult = Promise.resolve({ remote: true });
+      const remoteGetResult = Promise.resolve({remote: true});
       const fakeRemoteDoc = {
         get: jasmine.createSpy('remoteDoc.get').and.returnValue(remoteGetResult),
       };
@@ -64,7 +64,7 @@ describe('Doc integration', () => {
     });
 
     it('should read remote store once for recreated doc get request', done => {
-      const remoteGetResult = Promise.resolve({ remote: true });
+      const remoteGetResult = Promise.resolve({remote: true});
       const fakeRemoteDoc = {
         get: jasmine.createSpy('remoteDoc.get').and.returnValue(remoteGetResult),
       };
@@ -121,6 +121,54 @@ describe('Doc integration', () => {
     });
   });
 
+  describe('[set method]', () => {
+    it('should create new doc in remote storage', () => {
+      const docRef = db.doc('test');
+      const docData = {foo: 'foo'};
+
+      return docRef.set(docData).then(() => {
+        return db.getRemoteStorage().doc('test').get().then((remoteDocData) => {
+          expect(docData).toEqual(remoteDocData);
+        });
+      });
+    });
+
+    it('should return newly created snapshot', () => {
+      const docRef = db.doc('test');
+      const docData = {foo: 'foo'};
+
+      return docRef.set(docData).then(() => {
+        return docRef.get().then((docSnapshot) => {
+          expect(docData).toEqual(docSnapshot.toJSON());
+        });
+      });
+    });
+
+    it('should override already existed doc data in remote store', () => {
+      db.getRemoteStorage().addDoc('test', {foo: 'bar'});
+      const docRef = db.doc('test');
+      const docData = {foo: 'foo'};
+
+      return docRef.set(docData).then(() => {
+        return db.getRemoteStorage().doc('test').get().then((remoteDocData) => {
+          expect(docData).toEqual(remoteDocData);
+        });
+      });
+    });
+
+    it('should override already existed doc data and return snapshot', () => {
+      db.getRemoteStorage().addDoc('test', {foo: 'bar'});
+      const docRef = db.doc('test');
+      const docData = {foo: 'foo'};
+
+      return docRef.set(docData).then(() => {
+        return docRef.get().then((docSnapshot) => {
+          expect(docData).toEqual(docSnapshot.toJSON());
+        });
+      });
+    });
+  });
+
   describe('[update method]', () => {
     it('should return error for non-existing doc', (done) => {
       db.doc('test').update({}).catch(() => {
@@ -132,7 +180,7 @@ describe('Doc integration', () => {
       // add doc to remote database
       db.getRemoteStorage().addDoc('test', {});
 
-      const newData = { foo: 'foo' };
+      const newData = {foo: 'foo'};
       const doc = db.doc('test');
 
       return doc
@@ -147,7 +195,7 @@ describe('Doc integration', () => {
       // add doc to remote database
       db.getRemoteStorage().addDoc('test', {});
 
-      const newData = { foo: 'foo' };
+      const newData = {foo: 'foo'};
 
       return db.doc('test')
         .update(newData)
@@ -199,7 +247,7 @@ describe('Doc integration', () => {
 
     it('should return existing doc snapshot', () => {
       // add doc to remote database
-      const docData = { foo: 'foo' };
+      const docData = {foo: 'foo'};
       db.getRemoteStorage().addDoc('test', docData);
 
       return db.doc('test')

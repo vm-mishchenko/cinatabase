@@ -1,4 +1,4 @@
-import { Observable } from 'rxjs';
+import {Observable} from 'rxjs';
 
 // memory interfaces
 /**
@@ -29,6 +29,8 @@ export interface IRemoteDocData extends Object {
  * Abstraction over the remote store for particular document instance.
  */
 export interface IRemoteDocRef {
+  set(data: any): Promise<any>;
+
   get(): Promise<IRemoteDocData>;
 
   update(data: any): Promise<any>;

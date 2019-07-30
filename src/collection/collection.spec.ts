@@ -1,6 +1,7 @@
 import 'reflect-metadata';
-import { TestDatabase } from '../database/test-helpers/fake-database';
-import { Collection } from './collection';
+import {Doc} from '..';
+import {TestDatabase} from '../database/test-helpers/fake-database';
+import {Collection} from './collection';
 
 describe('Collection', () => {
   let db: TestDatabase;
@@ -18,7 +19,7 @@ describe('Collection', () => {
       const users = db.collection('users');
       const demoDocRef = users.doc('demo');
 
-      expect(demoDocRef instanceof Collection);
+      expect(demoDocRef instanceof Doc);
     });
 
     it('should return the same doc reference', () => {
@@ -34,10 +35,15 @@ describe('Collection', () => {
     // todo: need to fix it somehow, broken after doc was changed to doc-ref
     xit('should return all docs', () => {
       const collection = db.collection('users');
-      const docData = { test: 'foo' };
+      const query = collection.query({cached: true});
+
+      query.onSnapshot().subscribe((docSnapshots) => {
+        console.log(docSnapshots);
+      });
+
+      const docData = {test: 'foo'};
 
       return collection.doc('demo').update(docData).then(() => {
-        const query = collection.query();
         return query.onSnapshot().subscribe((docs) => {
           console.log(docs);
           expect(docs instanceof Map);

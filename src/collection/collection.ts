@@ -1,8 +1,8 @@
-import { BehaviorSubject, Observable } from 'rxjs';
-import { map, takeUntil } from 'rxjs/operators';
-import { IDoc } from '../document/doc';
-import { IDocFactory } from '../document/doc.factory';
-import { IRemoteStore } from '../interfaces';
+import {BehaviorSubject, Observable} from 'rxjs';
+import {map} from 'rxjs/operators';
+import {IDoc} from '../document/doc';
+import {IDocFactory} from '../document/doc.factory';
+import {IRemoteStore} from '../interfaces';
 
 /**
  * Document data (for use with `DocumentReference.set()`) consists of fields
@@ -53,7 +53,7 @@ export interface ICollection {
   doc(name: string): IDoc;
 
   // todo: add interface
-  query(): Query;
+  query(options: any): Query;
 
   sync(options: any): Sync;
 }
@@ -73,7 +73,7 @@ export class Sync {
   exec(): Promise<any> {
     return this.remoteStore.find({}).then((docsData) => {
       docsData.forEach((docData) => {
-        const { _id, ...data } = docData;
+        const {_id, ...data} = docData;
 
         this.internalCollection.addSyncedDoc(_id, data);
       });
@@ -135,7 +135,8 @@ export class InternalCollection {
   }
 
   // in memory only so far
-  query() {
+  // Creates subset of collection documents.
+  query(options: any = {}) {
     // todo: in future create QueryFactory which  should be injected in Collection
     return new Query(this);
   }

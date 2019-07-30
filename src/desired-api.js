@@ -23,8 +23,8 @@ db.collection('users').doc();
  * */
 
 // load users based on the options from pouch-db
-// @return {!Query}
-db.collection('users')
+// @return {!Sync}
+const sync = db.collection('users')
   .sync(/*...options*/)
   .exec();
 

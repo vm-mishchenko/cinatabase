@@ -1,11 +1,18 @@
 import PouchDB from 'pouchdb';
-import { IRemoteDocData, IRemoteDocRef } from '../interfaces';
+import {IRemoteDocData, IRemoteDocRef} from '../interfaces';
 
 export class PouchDbRemoteDocStore<M> implements IRemoteDocRef {
   // Represent id which is used for data storing in pouch database.
   private pouchDbId: PouchDB.Core.DocumentId = `${this.name}`;
 
   constructor(private name: string, private pouchDb: PouchDB.Database) {
+  }
+
+  set(data: any = {}): Promise<any> {
+    return this.pouchDb.put({
+      _id: this.pouchDbId,
+      ...data
+    });
   }
 
   /**
@@ -36,7 +43,7 @@ export class PouchDbRemoteDocStore<M> implements IRemoteDocRef {
    * Extracts original doc removing all pouch database metadata.
    */
   private extractDoc(rawDoc: PouchDB.Core.Document<M> & PouchDB.Core.GetMeta): IRemoteDocData {
-    const { _attachments, _revisions, _rev, _revs_info, _conflicts, ...doc } = rawDoc;
+    const {_attachments, _revisions, _rev, _revs_info, _conflicts, ...doc} = rawDoc;
 
     return doc;
   }

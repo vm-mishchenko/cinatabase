@@ -1,6 +1,6 @@
-import { BehaviorSubject, Observable } from 'rxjs';
-import { IMemoryDocStore, IRemoteDocRef } from '../interfaces';
-import { IMediator } from '../mediator';
+import {BehaviorSubject, Observable} from 'rxjs';
+import {IMemoryDocStore, IRemoteDocRef} from '../interfaces';
+import {IMediator} from '../mediator';
 
 export interface IDocSnapshot {
   id: string;
@@ -20,6 +20,8 @@ export interface IDoc {
   deleted$: Observable<boolean>;
 
   isDeleted(): boolean;
+
+  set(data: any): Promise<any>;
 
   update(data: any): Promise<any>;
 
@@ -112,6 +114,14 @@ export class Doc implements IDoc {
     }
   }
 
+  // create new or rewrite previously created doc
+  set(data: any = {}) {
+    return this.remoteStore.set(data).then(() => {
+      this.docSnapshot = new DocSnapshot(this.id, data);
+      this.notifySnapshot();
+    });
+  }
+
   /**
    * Updates memory and remote store data.
    * Frequent update requests may lead to performance hit for Remote store.
@@ -119,11 +129,14 @@ export class Doc implements IDoc {
    * responsibility how to handle these challenges belongs to store implementations.
    */
   update(data: any): Promise<any> {
+    // load data from remote storage
     return this.initSnapshot().then(() => {
+      // remote does not have such document
       if (!this.docSnapshot.exists) {
         return Promise.reject();
       }
 
+      // update remote document
       return this.remoteStore.update(data).then(() => {
         this.docSnapshot = new DocSnapshot(this.id, {
           ...this.docSnapshot.toJSON(),
@@ -196,7 +209,7 @@ export class Doc implements IDoc {
       .get()
       .then((docData) => {
           // document already exists
-          const { _id, ...data } = docData;
+          const {_id, ...data} = docData;
           this.docSnapshot = new DocSnapshot(_id, data);
         },
         () => {
