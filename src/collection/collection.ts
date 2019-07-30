@@ -1,31 +1,9 @@
 import {BehaviorSubject, Observable} from 'rxjs';
 import {map} from 'rxjs/operators';
-import {IDoc} from '../document/doc';
+import {IDoc, IDocData, IDocSnapshot} from '../document/doc';
 import {IDocFactory} from '../document/doc.factory';
 import {IRemoteStore} from '../interfaces';
-
-/**
- * Document data (for use with `DocumentReference.set()`) consists of fields
- * mapped to values.
- */
-export interface IDocumentData {
-  [field: string]: any;
-}
-
-/**
- * A `DocumentSnapshot` contains data read from a document in your Firestore
- * database. The data can be extracted with `.data()` or `.get(<field>)` to
- * get a specific field.
- */
-export interface IDocumentSnapshot {
-  /**
-   * Retrieves all fields in the document as an Object. Returns 'undefined' if
-   * the document doesn't exist.
-   */
-  data(): IDocumentData;
-
-  get(fieldPath: string): any;
-}
+import {Sync} from './sync';
 
 /**
  * A `QuerySnapshot` contains zero or more `DocumentSnapshot` objects
@@ -35,14 +13,18 @@ export interface IDocumentSnapshot {
  * properties.
  */
 export interface IQuerySnapshot {
-  /**
-   * Enumerates all of the documents in the QuerySnapshot.
-   *
-   * @param callback A callback to be called with a `QueryDocumentSnapshot` for
-   * each document in the snapshot.
-   * @param thisArg The `this` binding for the callback.
-   */
-  forEach(callback: (result: IDocumentSnapshot) => void, thisArg?: any): void;
+  docSnapshots: IDocSnapshot[];
+
+  size(): number;
+}
+
+export class QuerySnapshot implements IQuerySnapshot {
+  constructor(public docSnapshots: IDocSnapshot[]) {
+  }
+
+  size(): number {
+    return this.docSnapshots.length;
+  }
 }
 
 export interface IQuery {
@@ -58,30 +40,8 @@ export interface ICollection {
   sync(options: any): Sync;
 }
 
-/**
- * Load document data from the pouch-db.
- * Knows how to construct request query to based on the options.
- * Operates on document data level not in IDoc level.
- */
-export class Sync {
-  constructor(private internalCollection: InternalCollection,
-              private remoteStore: IRemoteStore,
-              private  options: any) {
-  }
-
-  // execute synchronization
-  exec(): Promise<any> {
-    return this.remoteStore.find({}).then((docsData) => {
-      docsData.forEach((docData) => {
-        const {_id, ...data} = docData;
-
-        this.internalCollection.addSyncedDoc(_id, data);
-      });
-    });
-  }
-}
-
 // todo: add interface
+// Store query configuration, does not store any data associated with the doc.
 export class Query {
   private docs$: Observable<Map<string, IDoc>> = this.internalCollection.onSnapshot();
   private docsSnapshot: Observable<Map<string, any>> = this.internalCollection.onSnapshot().pipe(
@@ -95,7 +55,20 @@ export class Query {
     }),
   );
 
-  constructor(private internalCollection: InternalCollection) {
+  constructor(private internalCollection: InternalCollection,
+              private options: IQueryOptions) {
+  }
+
+  get(): Promise<IQuerySnapshot> {
+    const syncPromise = this.options.cached ? Promise.resolve() : Promise.resolve();
+
+    return syncPromise.then(() => {
+      return Promise.all(
+        Array.from(this.internalCollection.docs.entries()).map(([i, doc]) => doc.get())
+      ).then((docsSnapshots) => {
+        return new QuerySnapshot(docsSnapshots);
+      });
+    });
   }
 
   onSnapshot(): Observable<Map<string, any>> {
@@ -103,10 +76,15 @@ export class Query {
   }
 }
 
+export interface IQueryOptions {
+  // defines should the new docs be fetched from remote storage
+  cached: boolean;
+}
+
 export class InternalCollection {
   // already initialized documents
-  private docs: Map<string, IDoc> = new Map();
-  private docs$: Observable<Map<string, IDoc>> = new BehaviorSubject<Map<string, IDoc>>(new Map());
+  docs: Map<string, IDoc> = new Map();
+  docs$: Observable<Map<string, IDoc>> = new BehaviorSubject<Map<string, IDoc>>(new Map());
 
   constructor(
     private name: string,
@@ -128,7 +106,10 @@ export class InternalCollection {
     return this.docs.get(id);
   }
 
-  addSyncedDoc(id: string, data: any) {
+  upsertDocData(id: string, data: IDocData) {
+    // todo: continue here
+    // we should create new docRef instance with updated data snapshot.
+    // Seems that docRef could be not unique value as I thought before.
     if (!this.docs.has(id)) {
       this.registerDoc(this.docFactory.get(id, data));
     }
@@ -136,17 +117,13 @@ export class InternalCollection {
 
   // in memory only so far
   // Creates subset of collection documents.
-  query(options: any = {}) {
+  query(options: IQueryOptions) {
     // todo: in future create QueryFactory which  should be injected in Collection
-    return new Query(this);
+    return new Query(this, options);
   }
 
   sync(options: any): Sync {
-    return new Sync(this, this.remoteStore, options);
-  }
-
-  snapshot(): Map<string, IDoc> {
-    return this.docs;
+    return new Sync(this, this.remoteStore);
   }
 
   onSnapshot(): Observable<Map<string, IDoc>> {
@@ -190,7 +167,7 @@ export class Collection implements ICollection {
   }
 
   // in memory only so far
-  query() {
-    return this.internalCollection.query();
+  query(options: IQueryOptions = {cached: false}) {
+    return this.internalCollection.query(options);
   }
 }

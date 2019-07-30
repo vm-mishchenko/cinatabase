@@ -2,6 +2,14 @@ import {BehaviorSubject, Observable} from 'rxjs';
 import {IMemoryDocStore, IRemoteDocRef} from '../interfaces';
 import {IMediator} from '../mediator';
 
+/**
+ * Document data (for use with `DocumentReference.set()`) consists of fields
+ * mapped to values.
+ */
+export interface IDocData {
+  [field: string]: any;
+}
+
 export interface IDocSnapshot {
   id: string;
 

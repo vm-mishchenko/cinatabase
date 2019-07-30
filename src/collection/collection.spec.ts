@@ -33,24 +33,48 @@ describe('Collection', () => {
 
   describe('[query method]', () => {
     // todo: need to fix it somehow, broken after doc was changed to doc-ref
-    xit('should return all docs', () => {
-      const collection = db.collection('users');
-      const query = collection.query({cached: true});
+    describe('[get method]', () => {
+      it('should return docs snapshot', () => {
+        const collection = db.collection('users');
 
-      query.onSnapshot().subscribe((docSnapshots) => {
-        console.log(docSnapshots);
-      });
+        collection.doc('firstDoc').set({firstDoc: 'firstDoc'}).then(() => {
+          const query = collection.query({cached: true});
 
-      const docData = {test: 'foo'};
-
-      return collection.doc('demo').update(docData).then(() => {
-        return query.onSnapshot().subscribe((docs) => {
-          console.log(docs);
-          expect(docs instanceof Map);
-          expect(docs.size).toEqual(1);
-          expect(docs.get('demo')).toEqual(docData);
+          return query.get().then((querySnapshots) => {
+            const firstDocSnapshot = querySnapshots.docSnapshots[0];
+            expect(firstDocSnapshot.id).toEqual('firstDoc');
+            expect(firstDocSnapshot.exists).toEqual(true);
+            expect(firstDocSnapshot.toJSON()).toEqual({firstDoc: 'firstDoc'});
+          });
         });
       });
+
+      it('should return newly added doc', () => {
+        const collection = db.collection('users');
+
+        return collection.doc('firstDoc').set({firstDoc: 'firstDoc'}).then(() => {
+          const query = collection.query({cached: true});
+
+          return query.get().then((querySnapshots) => {
+            const firstDocSnapshot = querySnapshots.docSnapshots[0];
+            expect(firstDocSnapshot.id).toEqual('firstDoc');
+            expect(firstDocSnapshot.exists).toEqual(true);
+            expect(firstDocSnapshot.toJSON()).toEqual({firstDoc: 'firstDoc'});
+
+            // add new doc to collection
+            return collection.doc('secondDoc').set({secondDoc: 'secondDoc'}).then(() => {
+              return query.get().then((newQuerySnapshot) => {
+                const secondDocSnapshot = newQuerySnapshot.docSnapshots[1];
+                expect(secondDocSnapshot.id).toEqual('secondDoc');
+                expect(secondDocSnapshot.exists).toEqual(true);
+                expect(secondDocSnapshot.toJSON()).toEqual({secondDoc: 'secondDoc'});
+              });
+            });
+          });
+        });
+      });
+
+
     });
   });
 });
