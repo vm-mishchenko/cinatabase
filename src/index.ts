@@ -89,7 +89,14 @@ class SyncServer {
         this.remote
       );
 
-      this.syncDocOperations.set(docId, sync.exec());
+      const syncPromise = sync.exec();
+
+      this.syncDocOperations.set(docId, syncPromise);
+
+      // clean doc operation after
+      syncPromise.finally(() => {
+        this.syncDocOperations.delete(docId);
+      });
     }
 
     return this.syncDocOperations.get(docId);
@@ -103,16 +110,13 @@ class SyncServer {
       this.remote
     );
 
-    this.syncOperations.push(sync);
-
-    return sync;
+    return sync.exec();
   }
 }
 
-class DefaultUpdateDocStrategy {
+class DefaultSetDocStrategy {
   constructor(private docId: string,
               private newData: any,
-              private options: DefaultUpdateStrategyOptions,
               private memory: MemoryDb,
               private remote: RemoteDb) {
   }
@@ -127,81 +131,35 @@ class DefaultUpdateDocStrategy {
   }
 }
 
-interface IMutateOptions {
-  strategy: string;
-  options?: any;
-}
-
-interface IMutateStrategy {
-  exec(): Promise<any>;
-}
-
-interface IMutateStrategyFactory {
-  createUpdateDocStrategy(
-    docId: string,
-    newData: any,
-    options: IMutateOptions,
-    memory: MemoryDb,
-    remote: RemoteDb
-  ): IMutateStrategy;
-}
-
-class DefaultSetStrategyOptions implements IMutateOptions {
-  strategy = 'default';
-
-  constructor(public onlyMemory: boolean = false) {
+class DefaultUpdateDocStrategy {
+  constructor(private docId: string,
+              private newData: any,
+              private memory: MemoryDb,
+              private remote: RemoteDb) {
   }
-}
 
-class DefaultUpdateStrategyOptions implements IMutateOptions {
-  strategy = 'default';
-
-  constructor(public onlyMemory: boolean = false) {
-  }
-}
-
-class DefaultMutateStrategyFactory implements IMutateStrategyFactory {
-  createUpdateDocStrategy(
-    docId: string,
-    newData: any,
-    options: DefaultUpdateStrategyOptions,
-    memory: MemoryDb,
-    remote: RemoteDb) {
-    return new DefaultUpdateDocStrategy(docId, newData, options, memory, remote);
+  exec() {
+    // Default strategy does not know cache strategies for underlying storage.
+    // It runs all in parallel.
+    return Promise.all([
+      this.memory.doc(this.docId).update(this.newData),
+      this.remote.doc(this.docId).update(this.newData)
+    ]);
   }
 }
 
 class MutateServer {
-  private strategyFactory: Map<string, IMutateStrategyFactory> = new Map();
-
   constructor(private memory: MemoryDb, private remote: RemoteDb) {
-    this.strategyFactory.set('default', new DefaultMutateStrategyFactory());
   }
 
-  setDocData(docId: string, newData, options: IMutateOptions = new DefaultSetStrategyOptions()) {
-    const mutateStrategyFactory = this.strategyFactory.get(options.strategy);
+  setDocData(docId: string, newData) {
+    const setDocStrategy = new DefaultSetDocStrategy(docId, newData, this.memory, this.remote);
 
-    const updateStrategy = mutateStrategyFactory.createUpdateDocStrategy(
-      docId,
-      newData,
-      options,
-      this.memory,
-      this.remote
-    );
-
-    return updateStrategy.exec();
+    return setDocStrategy.exec();
   }
 
-  updateDocData(docId: string, newData, options: IMutateOptions = new DefaultUpdateStrategyOptions()) {
-    const mutateStrategyFactory = this.strategyFactory.get(options.strategy);
-
-    const updateStrategy = mutateStrategyFactory.createUpdateDocStrategy(
-      docId,
-      newData,
-      options,
-      this.memory,
-      this.remote
-    );
+  updateDocData(docId: string, newData) {
+    const updateStrategy = new DefaultUpdateDocStrategy(docId, newData, this.memory, this.remote);
 
     return updateStrategy.exec();
   }
@@ -221,8 +179,8 @@ class DocRef {
   }
 
   // partial update
-  update(newData, options?: IMutateOptions) {
-    return this.mutateServer.updateDocData(this.id, newData, options);
+  update(newData) {
+    return this.mutateServer.updateDocData(this.id, newData);
   }
 }
 
@@ -283,7 +241,7 @@ const databaseManager = new DatabaseManager(
   console.log(`synced`);
 });*/
 
-// use case 1.1: two identical sync request
+// use case 1.1: two identical parallel sync request, one one should be executed
 /*const sync1 = databaseManager.doc('admin').sync();
 const sync2 = databaseManager.doc('admin').sync();
 Promise.all([
@@ -301,32 +259,12 @@ Promise.all([
 // use case 3: sync collection subset
 /*databaseManager.collection('users')
   .query().where('parent', '=', null)
-  .sync().passParamToMe().exec().then(() => {
+  .sync().then(() => {
   console.log(`collection query synced`);
 });*/
 
 // use case 4: mutate doc
-databaseManager.doc('admin').update({}).then(() => {
+/*databaseManager.doc('admin').update({}).then(() => {
   console.log(`updated`);
-});
-
-// use case 4: mutate doc using different strategy
-databaseManager.doc('admin').update({}, new DefaultUpdateStrategyOptions()).then(() => {
-  console.log(`updated`);
-});
-
-
-// use case 5: apply only latest mutate operation for 2 and more simultaneous mutate operations based on same doc
-// I could not blindly discard the first update request, since they update different data.
-/*const mutate1 = databaseManager.doc('admin').update({name: 'foo'});
-const mutate2 = databaseManager.doc('admin').update({age: 12});
-
-Promise.resolve([
-  mutate1,
-  mutate2,
-]).then(() => {
-  console.log(`done`);
 });*/
-
-
 
