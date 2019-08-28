@@ -1,7 +1,5 @@
 // DATABASES
-
 import {Observable, Subject} from 'rxjs';
-import {filter} from 'rxjs/operators';
 
 class MemoryDocRef {
   constructor(private id: string) {
@@ -132,7 +130,7 @@ class RemoteDb {
 
 // QUERY
 
-interface IEqualCondition {
+interface IQueryEqualCondition {
   [field: string]: string | number;
 }
 
@@ -143,22 +141,7 @@ interface IQueryOperators {
 }
 
 // @ts-ignore
-interface IQuery extends IEqualCondition, IQueryOperators {
-}
-
-// represent collection query
-// single document is special case of collection query
-class Query {
-  constructor(readonly collectionId: string, readonly query: IQuery) {
-  }
-
-  isSingleDoc(): boolean {
-    return this.query.hasOwnProperty('_id') && (typeof this.query['_id'] === 'string');
-  }
-
-  identification() {
-    return JSON.stringify(this.query);
-  }
+interface IQuery extends IQueryEqualCondition, IQueryOperators {
 }
 
 // SYNC
@@ -167,16 +150,23 @@ interface ISyncOptions {
   force?: boolean;
 }
 
-class DefaultQuerySyncStrategy {
-  constructor(private query: Query, private options: any, private memory: MemoryDb, private remote: RemoteDb) {
+interface ISyncStrategy {
+  exec(): Promise<any>;
+}
+
+class DefaultQuerySyncStrategy implements ISyncStrategy {
+  constructor(private collectionQuery: CollectionQuery,
+              private options: any,
+              private memory: MemoryDb,
+              private remote: RemoteDb) {
   }
 
   exec() {
-    const memoryCollection = this.memory.collection(this.query.collectionId);
-    const remoteCollection = this.remote.collection(this.query.collectionId);
+    const memoryCollection = this.memory.collection(this.collectionQuery.collectionId);
+    const remoteCollection = this.remote.collection(this.collectionQuery.collectionId);
 
     // translate query to remoteQuery
-    const remoteQuery = remoteCollection.query(this.query.query);
+    const remoteQuery = remoteCollection.query(this.collectionQuery.query);
 
     return remoteQuery.snapshot().then((remoteDocuments) => {
       remoteDocuments.forEach((remoteDocument) => {
@@ -186,99 +176,103 @@ class DefaultQuerySyncStrategy {
   }
 }
 
-class DefaultDocSyncStrategy {
-  constructor(private collectionId: string,
-              private docId: string,
+class DefaultDocSyncStrategy implements ISyncStrategy {
+  constructor(private docQuery: DocQuery,
               private options: any,
               private memory: MemoryDb,
               private remote: RemoteDb) {
   }
 
   exec() {
-    const memoryDoc = this.memory.collection(this.collectionId).doc(this.docId);
+    const memoryDoc = this.memory.collection(this.docQuery.collectionId).doc(this.docQuery.docId);
 
     if (!memoryDoc.isExists()) {
       return Promise.resolve();
     }
 
-    return this.remote.collection(this.collectionId).doc(this.docId).snapshot().then((remoteDoc) => {
+    return this.remote.collection(this.docQuery.collectionId).doc(this.docQuery.docId).snapshot().then((remoteDoc) => {
       memoryDoc.update(remoteDoc);
     });
   }
 }
 
+interface ITrackableQuery {
+  collectionId: string;
+  identificator: string;
+}
+
+class DocQuery implements ITrackableQuery {
+  identificator = `${this.collectionId}/${this.docId}`;
+
+  constructor(readonly collectionId: string, readonly docId: string) {
+  }
+}
+
+// represent collection query
+// single document is special case of collection query
+class CollectionQuery implements ITrackableQuery {
+  identificator = JSON.stringify(this.query);
+
+  constructor(readonly collectionId: string, readonly query: IQuery) {
+  }
+}
+
 class SyncServer {
-  private previouslySyncedQueries: Set<string> = new Set();
-  private syncDocOperations: Map<string, Promise<any>> = new Map();
+  private previouslySyncedQueries: Map<string, ITrackableQuery> = new Map();
+  private syncInProgress: Map<string, Promise<any>> = new Map();
 
   constructor(private memory: MemoryDb, private remote: RemoteDb) {
-    this.remote.events$.pipe(
-      filter((event) => Boolean(event instanceof RemoteCollectionUpdateEvent))
-    ).subscribe((event: RemoteCollectionUpdateEvent) => {
-      // invalidate all previously synced queries for updated collection id
-      // event.collectionId
-    });
   }
 
-  syncDoc(collectionId: string, docId: string, options: ISyncOptions = {}) {
-    const identification = `${collectionId}-${docId}`;
-
-    // doc was already synced
-    if (!options.force && this.previouslySyncedQueries.has(identification)) {
-      return Promise.resolve();
-    }
-
-    // sync in progress, return promise
-    if (this.syncDocOperations.has(identification)) {
-      return this.syncDocOperations.get(identification);
-    }
-
-    // start syncing
-    const sync = new DefaultDocSyncStrategy(
-      collectionId,
-      docId,
+  syncDoc(docQuery: DocQuery, options: ISyncOptions = {}) {
+    const syncStrategy = new DefaultDocSyncStrategy(
+      docQuery,
       options,
       this.memory,
       this.remote
     );
 
-    const syncPromise = sync.exec();
+    return this.sync(syncStrategy, docQuery, options);
+  }
+
+  syncQuery(collectionQuery: CollectionQuery, options?: ISyncOptions) {
+    const syncStrategy = new DefaultQuerySyncStrategy(
+      collectionQuery,
+      options,
+      this.memory,
+      this.remote
+    );
+
+    return this.sync(syncStrategy, collectionQuery, options);
+  }
+
+  private sync(strategy: ISyncStrategy, trackableQuery: ITrackableQuery, options: ISyncOptions) {
+    // query was already synced
+    if (!options.force && this.previouslySyncedQueries.has(trackableQuery.identificator)) {
+      return Promise.resolve();
+    }
+
+    // sync in progress, return promise
+    if (this.syncInProgress.has(trackableQuery.identificator)) {
+      return this.syncInProgress.get(trackableQuery.identificator);
+    }
+
+    console.log(`start syncing`);
+
+    // start syncing
+    const syncPromise = strategy.exec();
 
     // cache sync operation based on query representation
     // but not on query instance
-    this.syncDocOperations.set(identification, syncPromise);
+    this.syncInProgress.set(trackableQuery.identificator, syncPromise);
 
     // clean doc operation after
     syncPromise.finally(() => {
-      this.previouslySyncedQueries.add(identification);
-      this.syncDocOperations.delete(identification);
+      this.previouslySyncedQueries.set(trackableQuery.identificator, trackableQuery);
+      this.syncInProgress.delete(trackableQuery.identificator);
     });
 
     return syncPromise;
-  }
-
-  syncQuery(query: Query, options?: ISyncOptions) {
-    if (!this.syncDocOperations.has(query.identification())) {
-      const sync = new DefaultQuerySyncStrategy(
-        query,
-        options,
-        this.memory,
-        this.remote
-      );
-
-      const syncPromise = sync.exec();
-
-      // cache sync operation based on query representation
-      // but not on query instance
-      this.syncDocOperations.set(query.identification(), syncPromise);
-
-      // clean doc operation after
-      syncPromise.finally(() => {
-        this.syncDocOperations.delete(query.identification());
-      });
-    }
-
-    return this.syncDocOperations.get(query.identification());
   }
 }
 
@@ -345,10 +339,9 @@ class DocRef {
   }
 
   sync(options?) {
-    return this.syncServer.syncDoc(
-      this.collectionId,
-      this.docId
-    );
+    const docQuery = new DocQuery(this.collectionId, this.docId);
+
+    return this.syncServer.syncDoc(docQuery, options);
   }
 
   // rewrite any previous values
@@ -372,7 +365,7 @@ class CollectionQueryRef {
 
   sync(options?: any) {
     // todo: need to implement
-    const query = new Query(this.collectionId, {});
+    const query = new CollectionQuery(this.collectionId, {});
 
     return this.syncServer.syncQuery(query, options);
   }
@@ -417,9 +410,9 @@ const databaseManager = new DatabaseManager(
 );
 
 // use case 1: sync doc from remote to memory dbs
-/*databaseManager.doc('admin').sync().then(() => {
+databaseManager.doc('admin').sync().then(() => {
   console.log(`synced`);
-});*/
+});
 
 // use case 1.1: two identical parallel sync request, one one should be executed
 /*const sync1 = databaseManager.doc('admin').sync();
@@ -437,12 +430,12 @@ Promise.all([
 });*/
 
 // use case 2.1: should not call remote server for the sync if it's already synced
-const initialSync = databaseManager.collection('users').doc('admin').sync();
+/*const initialSync = databaseManager.collection('users').doc('admin').sync();
 initialSync.then(() => {
   databaseManager.collection('users').doc('admin').sync().then(() => {
     console.log('synced');
   });
-});
+});*/
 
 // use case 3: sync collection subset
 /*databaseManager.collection('users')
