@@ -1,3 +1,8 @@
+// DATABASES
+
+import {Observable, Subject} from 'rxjs';
+import {filter} from 'rxjs/operators';
+
 class MemoryDocRef {
   constructor(private id: string) {
   }
@@ -15,9 +20,32 @@ class MemoryDocRef {
   }
 }
 
+class MemoryCollectionRef {
+  constructor(private collectionId: string) {
+  }
+
+  doc(docId: string) {
+    return new MemoryDocRef(docId);
+  }
+
+  query() {
+    return new MemoryQueryCollectionRef();
+  }
+}
+
+class MemoryQueryCollectionRef {
+  snapshot() {
+    return [];
+  }
+}
+
 class MemoryDb {
   doc(id: string) {
     return new MemoryDocRef(id);
+  }
+
+  collection(collectionId: string) {
+    return new MemoryCollectionRef(collectionId);
   }
 }
 
@@ -34,56 +62,205 @@ class RemoteDocRef {
   }
 }
 
-class RemoteDb {
-  doc(id: string) {
-    return new RemoteDocRef(id);
+class RemoteCollectionRef {
+  constructor(private collectionId: string, private remoteAPI: RemoteAPI) {
+  }
+
+  doc(docId: string) {
+    return new RemoteDocRef(docId);
+  }
+
+  query(query: IQuery = {}) {
+    return new RemoteQueryCollectionRef(this.collectionId, query, this.remoteAPI);
   }
 }
 
-class DefaultSyncDocStrategy {
-  constructor(private id: string, private options: any, private memory: MemoryDb, private remote: RemoteDb) {
+class RemoteCollectionUpdateEvent {
+  constructor(readonly collectionId: string) {
+  }
+}
+
+class RemoteQueryCollectionRef {
+  constructor(private collectionId: string, private query: IQuery, private remoteAPI: RemoteAPI) {
+  }
+
+  update() {
+    this.remoteAPI.notify(new RemoteCollectionUpdateEvent(this.collectionId));
+  }
+
+  snapshot() {
+    return Promise.resolve([]);
+  }
+}
+
+class RemoteAPI {
+  constructor(private eventManager: EventManager) {
+  }
+
+  notify(event) {
+    this.eventManager.notify(event);
+  }
+}
+
+class EventManager {
+  events$: Observable<any> = new Subject();
+
+  notify(event: any) {
+    (this.events$ as Subject<any>).next(event);
+  }
+}
+
+class RemoteDb {
+  events$: Observable<any>;
+  private readonly api: RemoteAPI;
+  private readonly eventManager: EventManager;
+
+  constructor() {
+    this.eventManager = new EventManager();
+    this.api = new RemoteAPI(this.eventManager);
+    this.events$ = this.eventManager.events$;
+  }
+
+  doc(id: string) {
+    return new RemoteDocRef(id);
+  }
+
+  collection(collectionId: string) {
+    return new RemoteCollectionRef(collectionId, this.api);
+  }
+}
+
+// QUERY
+
+interface IEqualCondition {
+  [field: string]: string | number;
+}
+
+interface IQueryOperators {
+  [field: string]: {
+    [operator: string]: string | number
+  }
+}
+
+// @ts-ignore
+interface IQuery extends IEqualCondition, IQueryOperators {
+}
+
+// represent collection query
+// single document is special case of collection query
+class Query {
+  constructor(readonly collectionId: string, readonly query: IQuery) {
+  }
+
+  isSingleDoc(): boolean {
+    return this.query.hasOwnProperty('_id') && (typeof this.query['_id'] === 'string');
+  }
+
+  identification() {
+    return JSON.stringify(this.query);
+  }
+}
+
+// SYNC
+interface ISyncOptions {
+  // sync despite the fact that query was previously synced
+  force?: boolean;
+}
+
+class DefaultQuerySyncStrategy {
+  constructor(private query: Query, private options: any, private memory: MemoryDb, private remote: RemoteDb) {
   }
 
   exec() {
-    console.log(`DefaultSyncDocStrategy exec`);
+    const memoryCollection = this.memory.collection(this.query.collectionId);
+    const remoteCollection = this.remote.collection(this.query.collectionId);
 
-    const memoryDoc = this.memory.doc(this.id);
+    // translate query to remoteQuery
+    const remoteQuery = remoteCollection.query(this.query.query);
 
-    if (memoryDoc.isExists()) {
-      return Promise.resolve();
-    }
-
-    return this.remote.doc(this.id).snapshot().then((remoteSnapshot) => {
-      memoryDoc.set(remoteSnapshot);
+    return remoteQuery.snapshot().then((remoteDocuments) => {
+      remoteDocuments.forEach((remoteDocument) => {
+        memoryCollection.doc(remoteDocument.id).update(remoteDocument);
+      });
     });
   }
 }
 
-class DefaultSyncQueryStrategy {
-  constructor(private collectionId: string, private query: any, private memory: MemoryDb, private remote: RemoteDb) {
-  }
-
-  passParamToMe() {
-    return this;
+class DefaultDocSyncStrategy {
+  constructor(private collectionId: string,
+              private docId: string,
+              private options: any,
+              private memory: MemoryDb,
+              private remote: RemoteDb) {
   }
 
   exec() {
-    return Promise.resolve();
+    const memoryDoc = this.memory.collection(this.collectionId).doc(this.docId);
+
+    if (!memoryDoc.isExists()) {
+      return Promise.resolve();
+    }
+
+    return this.remote.collection(this.collectionId).doc(this.docId).snapshot().then((remoteDoc) => {
+      memoryDoc.update(remoteDoc);
+    });
   }
 }
 
 class SyncServer {
+  private previouslySyncedQueries: Set<string> = new Set();
   private syncDocOperations: Map<string, Promise<any>> = new Map();
-  private syncOperations = [];
 
   constructor(private memory: MemoryDb, private remote: RemoteDb) {
+    this.remote.events$.pipe(
+      filter((event) => Boolean(event instanceof RemoteCollectionUpdateEvent))
+    ).subscribe((event: RemoteCollectionUpdateEvent) => {
+      // invalidate all previously synced queries for updated collection id
+      // event.collectionId
+    });
   }
 
-  syncDoc(docId: string, options?: any) {
-    // cache sync operation while it's in progress
-    if (!this.syncDocOperations.has(docId)) {
-      const sync = new DefaultSyncDocStrategy(
-        docId,
+  syncDoc(collectionId: string, docId: string, options: ISyncOptions = {}) {
+    const identification = `${collectionId}-${docId}`;
+
+    // doc was already synced
+    if (!options.force && this.previouslySyncedQueries.has(identification)) {
+      return Promise.resolve();
+    }
+
+    // sync in progress, return promise
+    if (this.syncDocOperations.has(identification)) {
+      return this.syncDocOperations.get(identification);
+    }
+
+    // start syncing
+    const sync = new DefaultDocSyncStrategy(
+      collectionId,
+      docId,
+      options,
+      this.memory,
+      this.remote
+    );
+
+    const syncPromise = sync.exec();
+
+    // cache sync operation based on query representation
+    // but not on query instance
+    this.syncDocOperations.set(identification, syncPromise);
+
+    // clean doc operation after
+    syncPromise.finally(() => {
+      this.previouslySyncedQueries.add(identification);
+      this.syncDocOperations.delete(identification);
+    });
+
+    return syncPromise;
+  }
+
+  syncQuery(query: Query, options?: ISyncOptions) {
+    if (!this.syncDocOperations.has(query.identification())) {
+      const sync = new DefaultQuerySyncStrategy(
+        query,
         options,
         this.memory,
         this.remote
@@ -91,28 +268,21 @@ class SyncServer {
 
       const syncPromise = sync.exec();
 
-      this.syncDocOperations.set(docId, syncPromise);
+      // cache sync operation based on query representation
+      // but not on query instance
+      this.syncDocOperations.set(query.identification(), syncPromise);
 
       // clean doc operation after
       syncPromise.finally(() => {
-        this.syncDocOperations.delete(docId);
+        this.syncDocOperations.delete(query.identification());
       });
     }
 
-    return this.syncDocOperations.get(docId);
-  }
-
-  syncQuery(id: string, query: any) {
-    const sync = new DefaultSyncQueryStrategy(
-      id,
-      query,
-      this.memory,
-      this.remote
-    );
-
-    return sync.exec();
+    return this.syncDocOperations.get(query.identification());
   }
 }
+
+// MUTATE
 
 class DefaultSetDocStrategy {
   constructor(private docId: string,
@@ -165,22 +335,30 @@ class MutateServer {
   }
 }
 
+// PUBLIC INTERFACE
+
 class DocRef {
-  constructor(private id: string, private syncServer: SyncServer, private mutateServer: MutateServer) {
+  constructor(private collectionId: string,
+              private docId: string,
+              private syncServer: SyncServer,
+              private mutateServer: MutateServer) {
   }
 
   sync(options?) {
-    return this.syncServer.syncDoc(this.id, options);
+    return this.syncServer.syncDoc(
+      this.collectionId,
+      this.docId
+    );
   }
 
   // rewrite any previous values
   set(newData) {
-    return this.mutateServer.setDocData(this.id, newData);
+    return this.mutateServer.setDocData(this.collectionId, newData);
   }
 
   // partial update
   update(newData) {
-    return this.mutateServer.updateDocData(this.id, newData);
+    return this.mutateServer.updateDocData(this.collectionId, newData);
   }
 }
 
@@ -192,10 +370,11 @@ class CollectionQueryRef {
     return this;
   }
 
-  sync() {
-    const query = {};
+  sync(options?: any) {
+    // todo: need to implement
+    const query = new Query(this.collectionId, {});
 
-    return this.syncServer.syncQuery(this.collectionId, query);
+    return this.syncServer.syncQuery(query, options);
   }
 }
 
@@ -204,7 +383,7 @@ class CollectionRef {
   }
 
   doc(docId: string) {
-    return new DocRef(`${this.collectionId}/${docId}`, this.syncServer, this.mutateServer);
+    return new DocRef(this.collectionId, docId, this.syncServer, this.mutateServer);
   }
 
   query() {
@@ -213,14 +392,15 @@ class CollectionRef {
 }
 
 class DatabaseManager {
+  private defaultCollectionId = 'DEFAULT_COLLECTION_ID';
   private syncServer = new SyncServer(this.memory, this.remote);
   private mutateServer = new MutateServer(this.memory, this.remote);
 
   constructor(private memory: MemoryDb, private remote: RemoteDb) {
   }
 
-  doc(id) {
-    return new DocRef(id, this.syncServer, this.mutateServer);
+  doc(docId: string) {
+    return new DocRef(this.defaultCollectionId, docId, this.syncServer, this.mutateServer);
   }
 
   collection(id) {
@@ -255,6 +435,14 @@ Promise.all([
 /*databaseManager.collection('users').doc('admin').sync().then(() => {
   console.log(`synced`);
 });*/
+
+// use case 2.1: should not call remote server for the sync if it's already synced
+const initialSync = databaseManager.collection('users').doc('admin').sync();
+initialSync.then(() => {
+  databaseManager.collection('users').doc('admin').sync().then(() => {
+    console.log('synced');
+  });
+});
 
 // use case 3: sync collection subset
 /*databaseManager.collection('users')
