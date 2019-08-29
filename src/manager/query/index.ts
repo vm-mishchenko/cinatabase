@@ -13,22 +13,26 @@ export interface IQueryOperators {
 export interface IQuery extends IQueryEqualCondition, IQueryOperators {
 }
 
-export interface ITrackableQuery {
-  collectionId: string;
+
+/** <Entity> that has unique identificator. */
+export interface ITrackableIdentificator {
   identificator: string;
 }
 
-export class DocQuery implements ITrackableQuery {
-  identificator = `${this.collectionId}/${this.docId}`;
+export class DocIdentificator implements ITrackableIdentificator {
+  readonly identificator = `${this.collectionId}/${this.docId}`;
 
   constructor(readonly collectionId: string, readonly docId: string) {
   }
 }
 
-// represent collection query
-// single document is special case of collection query
-export class CollectionQuery implements ITrackableQuery {
-  identificator = JSON.stringify(this.query);
+/**
+ * Represents collection query.
+ * Internal representation which Mutate and Sync servers understand.
+ * Might represent 0 to N documents withing particular collection
+ */
+export class QueryIdentificator implements ITrackableIdentificator {
+  readonly identificator = JSON.stringify(this.query);
 
   constructor(readonly collectionId: string, readonly query: IQuery) {
   }

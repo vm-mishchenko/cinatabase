@@ -1,9 +1,13 @@
 import {MemoryDb} from '../../memory';
 import {RemoteDb} from '../../remote';
 import {MutateServer} from '../mutate';
-import {CollectionQuery, DocQuery} from '../query';
-import {SyncServer} from '../sync';
+import {DocIdentificator, IQuery, QueryIdentificator} from '../query';
+import {ISyncOptions, SyncServer} from '../sync';
 
+/**
+ * Represent Document from client point of view.
+ * Gather input data from the client and translate it to internal calls.
+ */
 export class DocRef {
   constructor(private collectionId: string,
               private docId: string,
@@ -11,10 +15,10 @@ export class DocRef {
               private mutateServer: MutateServer) {
   }
 
-  sync(options?) {
-    const docQuery = new DocQuery(this.collectionId, this.docId);
+  sync(options: ISyncOptions = {}) {
+    const docIdentificator = new DocIdentificator(this.collectionId, this.docId);
 
-    return this.syncServer.syncDoc(docQuery, options);
+    return this.syncServer.syncDoc(docIdentificator, options);
   }
 
   // rewrite any previous values
@@ -26,19 +30,23 @@ export class DocRef {
   update(newData) {
     return this.mutateServer.updateDocData(this.collectionId, newData);
   }
+
+  snapshot() {
+    const docIdentificator = new DocIdentificator(this.collectionId, this.docId);
+  }
 }
 
 class CollectionQueryRef {
-  constructor(private collectionId: string, private syncServer: SyncServer) {
+  constructor(private collectionId: string, private query: IQuery, private syncServer: SyncServer) {
   }
 
   where(key, comparison, value) {
     return this;
   }
 
-  sync(options?: any) {
+  sync(options: ISyncOptions = {}) {
     // todo: need to implement
-    const query = new CollectionQuery(this.collectionId, {});
+    const query = new QueryIdentificator(this.collectionId, {});
 
     return this.syncServer.syncQuery(query, options);
   }
@@ -52,8 +60,8 @@ export class CollectionRef {
     return new DocRef(this.collectionId, docId, this.syncServer, this.mutateServer);
   }
 
-  query() {
-    return new CollectionQueryRef(this.collectionId, this.syncServer);
+  query(query: IQuery = {}) {
+    return new CollectionQueryRef(this.collectionId, query, this.syncServer);
   }
 }
 

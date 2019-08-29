@@ -1,9 +1,9 @@
 import {MemoryDb} from '../../memory';
 import {RemoteDb} from '../../remote';
-import {CollectionQuery, DocQuery, ITrackableQuery} from '../query';
+import {DocIdentificator, ITrackableIdentificator, QueryIdentificator} from '../query';
 
-interface ISyncOptions {
-  // sync despite the fact that query was previously synced
+export interface ISyncOptions {
+  /** sync despite the fact that query was previously synced */
   force?: boolean;
 }
 
@@ -12,7 +12,7 @@ interface ISyncStrategy {
 }
 
 class DefaultQuerySyncStrategy implements ISyncStrategy {
-  constructor(private collectionQuery: CollectionQuery,
+  constructor(private collectionQuery: QueryIdentificator,
               private options: any,
               private memory: MemoryDb,
               private remote: RemoteDb) {
@@ -34,7 +34,7 @@ class DefaultQuerySyncStrategy implements ISyncStrategy {
 }
 
 class DefaultDocSyncStrategy implements ISyncStrategy {
-  constructor(private docQuery: DocQuery,
+  constructor(private docQuery: DocIdentificator,
               private options: any,
               private memory: MemoryDb,
               private remote: RemoteDb) {
@@ -54,24 +54,24 @@ class DefaultDocSyncStrategy implements ISyncStrategy {
 }
 
 export class SyncServer {
-  private previouslySyncedQueries: Map<string, ITrackableQuery> = new Map();
+  private previouslySyncedQueries: Map<string, ITrackableIdentificator> = new Map();
   private syncInProgress: Map<string, Promise<any>> = new Map();
 
   constructor(private memory: MemoryDb, private remote: RemoteDb) {
   }
 
-  syncDoc(docQuery: DocQuery, options: ISyncOptions = {}) {
+  syncDoc(docIdentificator: DocIdentificator, options: ISyncOptions = {}) {
     const syncStrategy = new DefaultDocSyncStrategy(
-      docQuery,
+      docIdentificator,
       options,
       this.memory,
       this.remote
     );
 
-    return this.sync(syncStrategy, docQuery, options);
+    return this.sync(syncStrategy, docIdentificator, options);
   }
 
-  syncQuery(collectionQuery: CollectionQuery, options?: ISyncOptions) {
+  syncQuery(collectionQuery: QueryIdentificator, options?: ISyncOptions) {
     const syncStrategy = new DefaultQuerySyncStrategy(
       collectionQuery,
       options,
@@ -82,7 +82,7 @@ export class SyncServer {
     return this.sync(syncStrategy, collectionQuery, options);
   }
 
-  private sync(strategy: ISyncStrategy, trackableQuery: ITrackableQuery, options: ISyncOptions) {
+  private sync(strategy: ISyncStrategy, trackableQuery: ITrackableIdentificator, options: ISyncOptions) {
     // query was already synced
     if (!options.force && this.previouslySyncedQueries.has(trackableQuery.identificator)) {
       return Promise.resolve();
@@ -92,8 +92,6 @@ export class SyncServer {
     if (this.syncInProgress.has(trackableQuery.identificator)) {
       return this.syncInProgress.get(trackableQuery.identificator);
     }
-
-    console.log(`start syncing`);
 
     // start syncing
     const syncPromise = strategy.exec();
