@@ -15,15 +15,21 @@ databaseManager.doc('admin').sync().then(() => {
   console.log(`synced`);
 });
 
+export {
+  MemoryDb,
+  RemoteDb,
+  DatabaseManager
+};
+
 // use case 1.1: two identical parallel sync request, one one should be executed
-/*const sync1 = databaseManager.doc('admin').sync();
+const sync1 = databaseManager.doc('admin').sync();
 const sync2 = databaseManager.doc('admin').sync();
 Promise.all([
   sync1,
   sync2
 ]).then(() => {
   console.log(`Double synced`);
-});*/
+});
 
 // use case 2: sync doc from the collection
 /*databaseManager.collection('users').doc('admin').sync().then(() => {
