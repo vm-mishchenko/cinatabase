@@ -60,6 +60,10 @@ export class SyncServer {
   constructor(private memory: MemoryDb, private remote: RemoteDb) {
   }
 
+  isIdentificatorSynced(trackableIdentificator: ITrackableIdentificator) {
+    return this.previouslySyncedQueries.has(trackableIdentificator.identificator);
+  }
+
   syncDoc(docIdentificator: DocIdentificator, options: ISyncOptions = {}) {
     const syncStrategy = new DefaultDocSyncStrategy(
       docIdentificator,
@@ -82,15 +86,15 @@ export class SyncServer {
     return this.sync(syncStrategy, collectionQuery, options);
   }
 
-  private sync(strategy: ISyncStrategy, trackableQuery: ITrackableIdentificator, options: ISyncOptions) {
+  private sync(strategy: ISyncStrategy, trackableIdentificator: ITrackableIdentificator, options: ISyncOptions) {
     // query was already synced
-    if (!options.force && this.previouslySyncedQueries.has(trackableQuery.identificator)) {
+    if (!options.force && this.previouslySyncedQueries.has(trackableIdentificator.identificator)) {
       return Promise.resolve();
     }
 
     // sync in progress, return promise
-    if (this.syncInProgress.has(trackableQuery.identificator)) {
-      return this.syncInProgress.get(trackableQuery.identificator);
+    if (this.syncInProgress.has(trackableIdentificator.identificator)) {
+      return this.syncInProgress.get(trackableIdentificator.identificator);
     }
 
     // start syncing
@@ -98,12 +102,12 @@ export class SyncServer {
 
     // cache sync operation based on query representation
     // but not on query instance
-    this.syncInProgress.set(trackableQuery.identificator, syncPromise);
+    this.syncInProgress.set(trackableIdentificator.identificator, syncPromise);
 
     // clean doc operation after
     syncPromise.finally(() => {
-      this.previouslySyncedQueries.set(trackableQuery.identificator, trackableQuery);
-      this.syncInProgress.delete(trackableQuery.identificator);
+      this.previouslySyncedQueries.set(trackableIdentificator.identificator, trackableIdentificator);
+      this.syncInProgress.delete(trackableIdentificator.identificator);
     });
 
     return syncPromise;

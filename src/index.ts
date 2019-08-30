@@ -65,4 +65,13 @@ initialSync.then(() => {
 });*/
 
 // use case 5: get document, automatically sync if it was not before
-databaseManager.doc('123').snapshot();
+/*databaseManager.doc('123').snapshot().then((data) => {
+  console.log(data);
+});*/
+
+// use case 5.1: should sync only once, for the first snapshot
+/*databaseManager.doc('123').snapshot().then(() => {
+  databaseManager.doc('123').snapshot().then(() => {
+    console.log(`data`);
+  });
+});*/

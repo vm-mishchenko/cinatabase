@@ -2,6 +2,7 @@ import {MemoryDb} from '../../memory';
 import {RemoteDb} from '../../remote';
 import {MutateServer} from '../mutate';
 import {DocIdentificator, IQuery, QueryIdentificator} from '../query';
+import {SnapshotServer} from '../snapshot';
 import {ISyncOptions, SyncServer} from '../sync';
 
 /**
@@ -12,7 +13,8 @@ export class DocRef {
   constructor(private collectionId: string,
               private docId: string,
               private syncServer: SyncServer,
-              private mutateServer: MutateServer) {
+              private mutateServer: MutateServer,
+              private snapshotServer: SnapshotServer) {
   }
 
   sync(options: ISyncOptions = {}) {
@@ -33,6 +35,8 @@ export class DocRef {
 
   snapshot() {
     const docIdentificator = new DocIdentificator(this.collectionId, this.docId);
+
+    return this.snapshotServer.docSnapshot(docIdentificator);
   }
 }
 
@@ -53,11 +57,14 @@ class CollectionQueryRef {
 }
 
 export class CollectionRef {
-  constructor(private collectionId: string, private syncServer: SyncServer, private mutateServer: MutateServer) {
+  constructor(private collectionId: string,
+              private syncServer: SyncServer,
+              private mutateServer: MutateServer,
+              private snapshotServer: SnapshotServer) {
   }
 
   doc(docId: string) {
-    return new DocRef(this.collectionId, docId, this.syncServer, this.mutateServer);
+    return new DocRef(this.collectionId, docId, this.syncServer, this.mutateServer, this.snapshotServer);
   }
 
   query(query: IQuery = {}) {
@@ -69,15 +76,16 @@ export class DatabaseManager {
   private defaultCollectionId = 'DEFAULT_COLLECTION_ID';
   private syncServer = new SyncServer(this.memory, this.remote);
   private mutateServer = new MutateServer(this.memory, this.remote);
+  private snapshotServer = new SnapshotServer(this.memory, this.remote, this.syncServer);
 
   constructor(private memory: MemoryDb, private remote: RemoteDb) {
   }
 
   doc(docId: string) {
-    return new DocRef(this.defaultCollectionId, docId, this.syncServer, this.mutateServer);
+    return new DocRef(this.defaultCollectionId, docId, this.syncServer, this.mutateServer, this.snapshotServer);
   }
 
   collection(id) {
-    return new CollectionRef(id, this.syncServer, this.mutateServer);
+    return new CollectionRef(id, this.syncServer, this.mutateServer, this.snapshotServer);
   }
 }

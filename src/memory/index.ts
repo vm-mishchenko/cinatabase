@@ -1,5 +1,5 @@
 class MemoryDocRef {
-  constructor(private id: string) {
+  constructor(private collectionId: string, private docId: string) {
   }
 
   isExists() {
@@ -13,6 +13,10 @@ class MemoryDocRef {
   update(data) {
     console.log(`memory doc update data`);
   }
+
+  snapshot() {
+    return {};
+  }
 }
 
 class MemoryCollectionRef {
@@ -20,7 +24,7 @@ class MemoryCollectionRef {
   }
 
   doc(docId: string) {
-    return new MemoryDocRef(docId);
+    return new MemoryDocRef(this.collectionId, docId);
   }
 
   query() {
@@ -35,8 +39,8 @@ class MemoryQueryCollectionRef {
 }
 
 export class MemoryDb {
-  doc(id: string) {
-    return new MemoryDocRef(id);
+  doc(collectionId: string, docId: string) {
+    return new MemoryDocRef(collectionId, docId);
   }
 
   collection(collectionId: string) {
