@@ -4,13 +4,12 @@ export interface IQueryEqualCondition {
 }
 
 export interface IQueryOperators {
-  [field: string]: {
-    [operator: string]: string | number
-  }
+  [operator: string]: string | number;
 }
 
 // @ts-ignore
-export interface IQuery extends IQueryEqualCondition, IQueryOperators {
+export interface IQuery {
+  [field: string]: string | number | IQueryOperators;
 }
 
 

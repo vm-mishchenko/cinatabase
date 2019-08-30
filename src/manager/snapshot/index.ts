@@ -3,6 +3,19 @@ import {RemoteDb} from '../../remote';
 import {DocIdentificator} from '../query';
 import {SyncServer} from '../sync';
 
+class DocSnapshot {
+  id = this.docData_ && this.docData_.id;
+  exists = Boolean(this.docData_);
+
+  constructor(private docData_: any) {
+  }
+
+  data() {
+    const {id, ...data} = this.docData_;
+    return data;
+  }
+}
+
 export class SnapshotServer {
   private syncInProgress: Map<string, Promise<any>> = new Map();
 
@@ -22,7 +35,9 @@ export class SnapshotServer {
     if (!this.syncInProgress.has(docIdentificator.identificator)) {
       // starts sync doc
       const snapshotPromise = this.syncServer.syncDoc(docIdentificator).then(() => {
-        return this.memory.doc(docIdentificator.collectionId, docIdentificator.docId).snapshot();
+        const memoryDoc = this.memory.doc(docIdentificator.collectionId, docIdentificator.docId).snapshot();
+
+        return new DocSnapshot(memoryDoc);
       });
 
       this.syncInProgress.set(docIdentificator.identificator, snapshotPromise);

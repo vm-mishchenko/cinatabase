@@ -12,8 +12,8 @@ class DefaultSetDocStrategy {
     // Default strategy does not know cache strategies for underlying storage.
     // It runs all in parallel.
     return Promise.all([
-      this.memory.doc(this.docId).update(this.newData),
-      this.remote.doc(this.docId).update(this.newData)
+      // this.memory.doc(this.docId).update(this.newData),
+      // this.remote.doc(this.docId).update(this.newData)
     ]);
   }
 }
@@ -29,8 +29,8 @@ class DefaultUpdateDocStrategy {
     // Default strategy does not know cache strategies for underlying storage.
     // It runs all in parallel.
     return Promise.all([
-      this.memory.doc(this.docId).update(this.newData),
-      this.remote.doc(this.docId).update(this.newData)
+      // this.memory.doc(this.docId).update(this.newData),
+      // this.remote.doc(this.docId).update(this.newData)
     ]);
   }
 }

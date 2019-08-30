@@ -43,8 +43,8 @@ class DefaultDocSyncStrategy implements ISyncStrategy {
   exec() {
     const memoryDoc = this.memory.collection(this.docQuery.collectionId).doc(this.docQuery.docId);
 
-    if (!memoryDoc.isExists()) {
-      return Promise.resolve();
+    if (memoryDoc.isExists()) {
+      return Promise.resolve(memoryDoc.snapshot());
     }
 
     return this.remote.collection(this.docQuery.collectionId).doc(this.docQuery.docId).snapshot().then((remoteDoc) => {
