@@ -7,6 +7,10 @@ PouchDB.plugin(PouchFind);
 
 const POUCH_STORAGE_LOCAL_DB_NAME_KEY = 'pouchdb-storage:local-database-name';
 
+export interface IRemoteDocData {
+  id: string;
+}
+
 class RemoteDocRef {
   private databaseDocId = `${this.collectionId}:${this.docId}`;
 
@@ -14,11 +18,44 @@ class RemoteDocRef {
   }
 
   update(newData: any) {
-    return Promise.resolve();
+    return this.getRawData().then((rawData) => {
+      return this.database.put({
+        ...rawData,
+        ...newData
+      });
+    });
+  }
+
+  add(newData: any) {
+    const data = {
+      _id: this.databaseDocId,
+      id: this.docId,
+      type: this.collectionId,
+      ...newData
+    };
+
+    return this.database.put(data);
   }
 
   snapshot() {
-    return this.database.get(this.databaseDocId).then((rawDoc) => this.clearRawData(rawDoc));
+    return this.getRawData().then((rawDoc) => this.clearRawData(rawDoc));
+  }
+
+  /** Create new doc if doesn't exist and set data*/
+  set(newData) {
+    return this.isExist().then(() => {
+      return this.update(newData);
+    }, () => {
+      return this.add(newData);
+    });
+  }
+
+  isExist() {
+    return this.getRawData().then(() => true);
+  }
+
+  private getRawData(): Promise<any> {
+    return this.database.get(this.databaseDocId);
   }
 
   private clearRawData(rawDoc) {

@@ -1,6 +1,6 @@
 import {MemoryDb} from '../../memory';
 import {RemoteDb} from '../../remote';
-import {MutateServer} from '../mutate';
+import {IUpdateDocOptions, MutateServer} from '../mutate';
 import {DocIdentificator, IQuery, QueryIdentificator} from '../query';
 import {SnapshotServer} from '../snapshot';
 import {ISyncOptions, SyncServer} from '../sync';
@@ -10,6 +10,8 @@ import {ISyncOptions, SyncServer} from '../sync';
  * Gather input data from the client and translate it to internal calls.
  */
 export class DocRef {
+  private docIdentificator = new DocIdentificator(this.collectionId, this.docId);
+
   constructor(private collectionId: string,
               private docId: string,
               private syncServer: SyncServer,
@@ -25,18 +27,20 @@ export class DocRef {
 
   // rewrite any previous values
   set(newData) {
-    return this.mutateServer.setDocData(this.collectionId, newData);
+    return this.mutateServer.setDocData(this.docIdentificator, newData);
   }
 
   // partial update
-  update(newData) {
-    return this.mutateServer.updateDocData(this.collectionId, newData);
+  update(newData, options?: IUpdateDocOptions) {
+    return this.mutateServer.updateDocData(
+      this.docIdentificator,
+      newData,
+      options
+    );
   }
 
   snapshot() {
-    const docIdentificator = new DocIdentificator(this.collectionId, this.docId);
-
-    return this.snapshotServer.docSnapshot(docIdentificator);
+    return this.snapshotServer.docSnapshot(this.docIdentificator);
   }
 }
 

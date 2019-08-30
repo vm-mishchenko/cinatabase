@@ -1,6 +1,9 @@
 import {BehaviorSubject} from 'rxjs';
+import {DocIdentificator} from '../manager/query';
 
 class MemoryDocRef {
+  private docIdentificator = new DocIdentificator(this.collectionId, this.docId);
+
   constructor(private collectionId: string, private docId: string, private memoryDb: MemoryDb) {
   }
 
@@ -8,12 +11,12 @@ class MemoryDocRef {
     return false;
   }
 
-  set(data) {
-    console.log(`memory doc set data`);
+  set(newData: any) {
+    this.memoryDb.setDoc(this.docIdentificator, newData);
   }
 
-  update(data) {
-    this.memoryDb.updateDoc(this.collectionId, this.docId, data);
+  update(newData: any) {
+    this.memoryDb.updateDoc(this.collectionId, this.docId, newData);
   }
 
   snapshot() {
@@ -42,6 +45,20 @@ class MemoryQueryCollectionRef {
 
 export class MemoryDb {
   private collections: BehaviorSubject<Map<string, any>> = new BehaviorSubject<any>(new Map());
+
+  setDoc(docIdentificator: DocIdentificator, newData: any) {
+    const allCollections = this.collections.getValue();
+
+    if (!allCollections.has(docIdentificator.collectionId)) {
+      allCollections.set(docIdentificator.collectionId, new Map());
+    }
+
+    const collection = allCollections.get(docIdentificator.collectionId);
+
+    collection.set(docIdentificator.docId, newData);
+
+    this.collections.next(allCollections);
+  }
 
   updateDoc(collectionId: string, docId: string, data: any) {
     const allCollections = this.collections.getValue();

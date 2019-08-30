@@ -4,14 +4,14 @@ import {DocIdentificator} from '../query';
 import {SyncServer} from '../sync';
 
 class DocSnapshot {
-  id = this.docData_ && this.docData_.id;
-  exists = Boolean(this.docData_);
+  id = this.docData && this.docData.id;
+  exists = Boolean(this.docData);
 
-  constructor(private docData_: any) {
+  constructor(private docData: any) {
   }
 
   data() {
-    const {id, ...data} = this.docData_;
+    const {id, ...data} = this.docData;
     return data;
   }
 }

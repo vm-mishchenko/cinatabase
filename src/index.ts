@@ -59,11 +59,6 @@ initialSync.then(() => {
   console.log(`collection query synced`);
 });*/
 
-// use case 4: mutate doc
-/*databaseManager.doc('admin').update({}).then(() => {
-  console.log(`updated`);
-});*/
-
 // use case 5: get document, automatically sync if it was not before
 /*databaseManager.doc('123').snapshot().then((data) => {
   console.log(data);
@@ -74,4 +69,9 @@ initialSync.then(() => {
   databaseManager.doc('123').snapshot().then(() => {
     console.log(`data`);
   });
+});*/
+
+// use case 6.1: should create doc or rewrite in case if it's already exist
+/*databaseManager.collection('users').doc('foo').set({}).then(() => {
+  console.log(`set is done`);
 });*/
