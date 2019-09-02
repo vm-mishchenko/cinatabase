@@ -1,5 +1,5 @@
 import {BehaviorSubject} from 'rxjs';
-import {DocIdentificator} from '../manager/query';
+import {DocIdentificator, IQueryRequest} from '../manager/query';
 
 class MemoryDocRef {
   private docIdentificator = new DocIdentificator(this.collectionId, this.docId);
@@ -32,20 +32,36 @@ class MemoryCollectionRef {
     return new MemoryDocRef(this.collectionId, docId, this.memoryDb);
   }
 
-  query() {
-    return new MemoryQueryCollectionRef();
+  query(queryRequest?: IQueryRequest) {
+    return new MemoryQueryCollectionRef(this.collectionId, queryRequest, this.memoryDb);
   }
 }
 
 class MemoryQueryCollectionRef {
+  constructor(private collectionId: string,
+              private queryRequest: IQueryRequest,
+              private memoryDb: MemoryDb) {
+  }
+
   snapshot() {
-    return [];
+    return this.memoryDb.getQuerySnapshot(this.collectionId, this.queryRequest);
   }
 }
 
-export class MemoryDb {
-  private collections: BehaviorSubject<Map<string, any>> = new BehaviorSubject<any>(new Map());
+type MemoryCollectionData = Map<string, any>;
 
+export class MemoryDb {
+  private collections: BehaviorSubject<Map<string, MemoryCollectionData>> = new BehaviorSubject(new Map());
+
+  doc(collectionId: string, docId: string) {
+    return new MemoryDocRef(collectionId, docId, this);
+  }
+
+  collection(collectionId: string) {
+    return new MemoryCollectionRef(collectionId, this);
+  }
+
+  // todo: should be hidden later under the internal API
   setDoc(docIdentificator: DocIdentificator, newData: any) {
     const allCollections = this.collections.getValue();
 
@@ -91,11 +107,19 @@ export class MemoryDb {
     return collection && collection.get(docId);
   }
 
-  doc(collectionId: string, docId: string) {
-    return new MemoryDocRef(collectionId, docId, this);
-  }
+  getQuerySnapshot(collectionId: string, queryRequest: IQueryRequest) {
+    const allCollections = this.collections.getValue();
 
-  collection(collectionId: string) {
-    return new MemoryCollectionRef(collectionId, this);
+    if (!allCollections.has(collectionId)) {
+      return [];
+    }
+
+    // todo: apply queryRequest
+    return Array.from(allCollections.get(collectionId)).map(([id, doc]) => {
+      return {
+        id,
+        ...doc
+      };
+    });
   }
 }

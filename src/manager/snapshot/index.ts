@@ -1,9 +1,17 @@
 import {MemoryDb} from '../../memory';
 import {RemoteDb} from '../../remote';
-import {DocIdentificator} from '../query';
+import {DocIdentificator, QueryIdentificator} from '../query';
 import {SyncServer} from '../sync';
 
-class DocSnapshot {
+export interface IQuerySnapshotOptions {
+  source?: string;
+}
+
+const defaultQuerySnapshotOptions = {
+  source: 'memory'
+};
+
+export class DocSnapshot {
   id = this.docData && this.docData.id;
   exists = Boolean(this.docData);
 
@@ -16,6 +24,19 @@ class DocSnapshot {
   }
 }
 
+export class QuerySnapshot {
+  constructor(private docs: any[]) {
+  }
+
+  data() {
+    return this.docs;
+  }
+
+  count() {
+    return this.docs.length;
+  }
+}
+
 export class SnapshotServer {
   private syncInProgress: Map<string, Promise<any>> = new Map();
 
@@ -24,7 +45,8 @@ export class SnapshotServer {
               private syncServer: SyncServer) {
   }
 
-  docSnapshot(docIdentificator: DocIdentificator) {
+
+  docSnapshot(docIdentificator: DocIdentificator): Promise<DocSnapshot> {
     // check whether it was already synced
     if (this.syncServer.isIdentificatorSynced(docIdentificator)) {
       // return snapshot from the memory store
@@ -44,5 +66,13 @@ export class SnapshotServer {
     }
 
     return this.syncInProgress.get(docIdentificator.identificator);
+  }
+
+  querySnapshot(queryIdentificator: QueryIdentificator, options: IQuerySnapshotOptions = defaultQuerySnapshotOptions) {
+    const memoryCollection = this.memory.collection(queryIdentificator.collectionId);
+    const memoryQuerySnapshot = memoryCollection.query(queryIdentificator.queryRequest).snapshot();
+    const querySnapshot = new QuerySnapshot(memoryQuerySnapshot);
+
+    return Promise.resolve(querySnapshot);
   }
 }

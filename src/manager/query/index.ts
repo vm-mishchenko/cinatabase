@@ -8,10 +8,9 @@ export interface IQueryOperators {
 }
 
 // @ts-ignore
-export interface IQuery {
+export interface IQueryRequest {
   [field: string]: string | number | IQueryOperators;
 }
-
 
 /** <Entity> that has unique identificator. */
 export interface ITrackableIdentificator {
@@ -31,8 +30,8 @@ export class DocIdentificator implements ITrackableIdentificator {
  * Might represent 0 to N documents withing particular collection
  */
 export class QueryIdentificator implements ITrackableIdentificator {
-  readonly identificator = JSON.stringify(this.query);
+  readonly identificator = JSON.stringify(this.queryRequest);
 
-  constructor(readonly collectionId: string, readonly query: IQuery) {
+  constructor(readonly collectionId: string, readonly queryRequest: IQueryRequest) {
   }
 }

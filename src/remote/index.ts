@@ -1,14 +1,17 @@
 import PouchDB from 'pouchdb';
 import PouchFind from 'pouchdb-find';
 import {Observable, Subject} from 'rxjs';
-import {IQuery} from '../manager/query';
+import {IQueryRequest} from '../manager/query';
 
 PouchDB.plugin(PouchFind);
 
 const POUCH_STORAGE_LOCAL_DB_NAME_KEY = 'pouchdb-storage:local-database-name';
 
-export interface IRemoteDocData {
+export interface IPouchdbRawExistingStorageEntity {
+  _id: string;
+  _rev: string;
   id: string;
+  type: string;
 }
 
 class RemoteDocRef {
@@ -18,7 +21,7 @@ class RemoteDocRef {
   }
 
   update(newData: any) {
-    return this.getRawData().then((rawData) => {
+    return this.getRawDoc().then((rawData) => {
       return this.database.put({
         ...rawData,
         ...newData
@@ -26,7 +29,34 @@ class RemoteDocRef {
     });
   }
 
-  add(newData: any) {
+  snapshot() {
+    return this.getRawDoc().then((rawDoc) => this.extractDoc(rawDoc));
+  }
+
+  /** Create new doc if doesn't exist and set data*/
+  set(newData) {
+    return this.isExist().then(() => {
+      return this.getRawDoc().then((rawData) => {
+        const {_id, type, id, ...previousData} = rawData;
+
+        // rewrite any previous data
+        return this.database.put({
+          _id,
+          id,
+          type,
+          ...newData
+        });
+      });
+    }, () => {
+      return this.createNew(newData);
+    });
+  }
+
+  isExist() {
+    return this.getRawDoc().then(() => true);
+  }
+
+  private createNew(newData: any) {
     const data = {
       _id: this.databaseDocId,
       id: this.docId,
@@ -37,28 +67,11 @@ class RemoteDocRef {
     return this.database.put(data);
   }
 
-  snapshot() {
-    return this.getRawData().then((rawDoc) => this.clearRawData(rawDoc));
-  }
-
-  /** Create new doc if doesn't exist and set data*/
-  set(newData) {
-    return this.isExist().then(() => {
-      return this.update(newData);
-    }, () => {
-      return this.add(newData);
-    });
-  }
-
-  isExist() {
-    return this.getRawData().then(() => true);
-  }
-
-  private getRawData(): Promise<any> {
+  private getRawDoc(): Promise<any> {
     return this.database.get(this.databaseDocId);
   }
 
-  private clearRawData(rawDoc) {
+  private extractDoc(rawDoc) {
     const {_id, _rev, type, ...doc} = rawDoc;
 
     return doc;
@@ -73,7 +86,7 @@ class RemoteCollectionRef {
     return new RemoteDocRef(this.collectionId, docId, this.database);
   }
 
-  query(query: IQuery = {}) {
+  query(query: IQueryRequest = {}) {
     return new RemoteQueryCollectionRef(this.collectionId, query, this.database);
   }
 }
@@ -84,14 +97,25 @@ class RemoteCollectionUpdateEvent {
 }
 
 class RemoteQueryCollectionRef {
-  constructor(private collectionId: string, private query: IQuery, private database: any) {
+  constructor(private collectionId: string, private query: IQueryRequest, private database: any) {
   }
 
   update() {
   }
 
   snapshot() {
-    return Promise.resolve([]);
+    return this.database.find({
+      selector: {
+        selector: {},
+        type: this.collectionId
+      }
+    }).then((result) => {
+      return result.docs.map((rawDoc) => {
+        const {_id, _rev, type, ...doc} = rawDoc;
+
+        return doc;
+      });
+    });
   }
 }
 
@@ -150,4 +174,3 @@ export class RemoteDb {
     return String(Date.now());
   }
 }
-

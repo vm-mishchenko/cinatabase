@@ -23,11 +23,13 @@ class DefaultQuerySyncStrategy implements ISyncStrategy {
     const remoteCollection = this.remote.collection(this.collectionQuery.collectionId);
 
     // translate query to remoteQuery
-    const remoteQuery = remoteCollection.query(this.collectionQuery.query);
+    const remoteQuery = remoteCollection.query(this.collectionQuery.queryRequest);
 
     return remoteQuery.snapshot().then((remoteDocuments) => {
-      remoteDocuments.forEach((remoteDocument) => {
-        memoryCollection.doc(remoteDocument.id).update(remoteDocument);
+      remoteDocuments.forEach((remoteDoc) => {
+        const {id, ...remoteDocData} = remoteDoc;
+
+        memoryCollection.doc(id).set(remoteDocData);
       });
     });
   }

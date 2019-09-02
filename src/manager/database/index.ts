@@ -1,8 +1,8 @@
 import {MemoryDb} from '../../memory';
 import {RemoteDb} from '../../remote';
 import {IUpdateDocOptions, MutateServer} from '../mutate';
-import {DocIdentificator, IQuery, QueryIdentificator} from '../query';
-import {SnapshotServer} from '../snapshot';
+import {DocIdentificator, IQueryRequest, QueryIdentificator} from '../query';
+import {IQuerySnapshotOptions, SnapshotServer} from '../snapshot';
 import {ISyncOptions, SyncServer} from '../sync';
 
 /**
@@ -39,24 +39,50 @@ export class DocRef {
     );
   }
 
+  /**
+   * Returns doc snapshot.
+   * Client does care whether doc was taken from the memory or remote databases.
+   */
   snapshot() {
     return this.snapshotServer.docSnapshot(this.docIdentificator);
+  }
+
+  // check whether it exists in the remote store
+  isExists() {
+    this.snapshotServer.docSnapshot(this.docIdentificator).then((snapshot) => {
+      return snapshot.exists ? Promise.resolve() : Promise.reject();
+    });
   }
 }
 
 class CollectionQueryRef {
-  constructor(private collectionId: string, private query: IQuery, private syncServer: SyncServer) {
+  constructor(private collectionId: string,
+              private queryRequest: IQueryRequest,
+              private syncServer: SyncServer,
+              private snapshotServer: SnapshotServer) {
   }
 
   where(key, comparison, value) {
     return this;
   }
 
+  limit(count: number) {
+    return this;
+  }
+
   sync(options: ISyncOptions = {}) {
-    // todo: need to implement
     const query = new QueryIdentificator(this.collectionId, {});
 
     return this.syncServer.syncQuery(query, options);
+  }
+
+  snapshot(options?: IQuerySnapshotOptions) {
+    return this.snapshotServer.querySnapshot(this.queryIdentificator(), options);
+  }
+
+  queryIdentificator() {
+    // todo: need to implement
+    return new QueryIdentificator(this.collectionId, {});
   }
 }
 
@@ -71,8 +97,8 @@ export class CollectionRef {
     return new DocRef(this.collectionId, docId, this.syncServer, this.mutateServer, this.snapshotServer);
   }
 
-  query(query: IQuery = {}) {
-    return new CollectionQueryRef(this.collectionId, query, this.syncServer);
+  query(queryRequest: IQueryRequest = {}) {
+    return new CollectionQueryRef(this.collectionId, queryRequest, this.syncServer, this.snapshotServer);
   }
 }
 
