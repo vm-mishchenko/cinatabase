@@ -20,9 +20,7 @@ export class DocRef {
   }
 
   sync(options: ISyncOptions = {}) {
-    const docIdentificator = new DocIdentificator(this.collectionId, this.docId);
-
-    return this.syncServer.syncDoc(docIdentificator, options);
+    return this.syncServer.syncDoc(this.docIdentificator, options);
   }
 
   // rewrite any previous values
@@ -45,6 +43,10 @@ export class DocRef {
    */
   snapshot() {
     return this.snapshotServer.docSnapshot(this.docIdentificator);
+  }
+
+  onSnapshot() {
+    return this.snapshotServer.docOnSnapshot(this.docIdentificator);
   }
 
   // check whether it exists in the remote store

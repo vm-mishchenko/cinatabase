@@ -2,17 +2,11 @@ import PouchDB from 'pouchdb';
 import PouchFind from 'pouchdb-find';
 import {Observable, Subject} from 'rxjs';
 import {IQueryRequest} from '../manager/query';
+import {DocSnapshot} from '../manager/snapshot';
 
 PouchDB.plugin(PouchFind);
 
 const POUCH_STORAGE_LOCAL_DB_NAME_KEY = 'pouchdb-storage:local-database-name';
-
-export interface IPouchdbRawExistingStorageEntity {
-  _id: string;
-  _rev: string;
-  id: string;
-  type: string;
-}
 
 class RemoteDocRef {
   private databaseDocId = `${this.collectionId}:${this.docId}`;
@@ -30,18 +24,23 @@ class RemoteDocRef {
   }
 
   snapshot() {
-    return this.getRawDoc().then((rawDoc) => this.extractDoc(rawDoc));
+    return this.getRawDoc().then((rawDoc) => {
+      const {id, ...docData} = this.extractDoc(rawDoc);
+
+      return new DocSnapshot(id, docData);
+    });
   }
 
   /** Create new doc if doesn't exist and set data*/
   set(newData) {
     return this.isExist().then(() => {
       return this.getRawDoc().then((rawData) => {
-        const {_id, type, id, ...previousData} = rawData;
+        const {_id, type, id, _rev, ...previousData} = rawData;
 
         // rewrite any previous data
         return this.database.put({
           _id,
+          _rev,
           id,
           type,
           ...newData
@@ -88,11 +87,6 @@ class RemoteCollectionRef {
 
   query(query: IQueryRequest = {}) {
     return new RemoteQueryCollectionRef(this.collectionId, query, this.database);
-  }
-}
-
-class RemoteCollectionUpdateEvent {
-  constructor(readonly collectionId: string) {
   }
 }
 

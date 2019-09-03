@@ -1,5 +1,7 @@
 import {BehaviorSubject} from 'rxjs';
+import {map, shareReplay} from 'rxjs/operators';
 import {DocIdentificator, IQueryRequest} from '../manager/query';
+import {DocSnapshot, QuerySnapshot} from '../manager/snapshot';
 
 class MemoryDocRef {
   private docIdentificator = new DocIdentificator(this.collectionId, this.docId);
@@ -21,6 +23,10 @@ class MemoryDocRef {
 
   snapshot() {
     return this.memoryDb.getDocSnapshot(this.collectionId, this.docId);
+  }
+
+  onSnapshot() {
+    return this.memoryDb.getDocOnSnapshot(this.collectionId, this.docId);
   }
 }
 
@@ -50,8 +56,34 @@ class MemoryQueryCollectionRef {
 
 type MemoryCollectionData = Map<string, any>;
 
+class MemoryCollection {
+  private internalDocs: BehaviorSubject<Map<string, any>> = new BehaviorSubject(new Map());
+
+  readonly changes$ = this.internalDocs.asObservable().pipe(
+    shareReplay(1)
+  );
+
+  set(docId: string, data: any) {
+    const docs = this.internalDocs.getValue();
+
+    this.internalDocs.next(new Map(docs).set(docId, data));
+  }
+
+  get(docId: string) {
+    return this.internalDocs.getValue().get(docId);
+  }
+
+  has(docId: string) {
+    return this.internalDocs.getValue().has(docId);
+  }
+
+  docs() {
+    return this.internalDocs.getValue();
+  }
+}
+
 export class MemoryDb {
-  private collections: BehaviorSubject<Map<string, MemoryCollectionData>> = new BehaviorSubject(new Map());
+  private collections: Map<string, MemoryCollection> = new Map();
 
   doc(collectionId: string, docId: string) {
     return new MemoryDocRef(collectionId, docId, this);
@@ -63,63 +95,58 @@ export class MemoryDb {
 
   // todo: should be hidden later under the internal API
   setDoc(docIdentificator: DocIdentificator, newData: any) {
-    const allCollections = this.collections.getValue();
-
-    if (!allCollections.has(docIdentificator.collectionId)) {
-      allCollections.set(docIdentificator.collectionId, new Map());
+    if (!this.collections.has(docIdentificator.collectionId)) {
+      this.collections.set(docIdentificator.collectionId, new MemoryCollection());
     }
 
-    const collection = allCollections.get(docIdentificator.collectionId);
+    const collection = this.collections.get(docIdentificator.collectionId);
 
     collection.set(docIdentificator.docId, newData);
-
-    this.collections.next(allCollections);
   }
 
   updateDoc(collectionId: string, docId: string, data: any) {
-    const allCollections = this.collections.getValue();
-
-    if (!allCollections.has(collectionId)) {
-      allCollections.set(collectionId, new Map());
+    if (!this.collections.has(collectionId)) {
+      this.collections.set(collectionId, new MemoryCollection());
     }
 
-    const collection = allCollections.get(collectionId);
-
-    if (!collection.has(docId)) {
-      collection.set(docId, {});
-    }
-
-    const previousDocData = collection.get(docId);
+    const collection = this.collections.get(collectionId);
+    const previousDocData = collection.get(docId) || {};
     const newDocData = {
       ...previousDocData,
       ...data
     };
 
     collection.set(docId, newDocData);
-
-    this.collections.next(allCollections);
   }
 
   getDocSnapshot(collectionId: string, docId: string) {
-    const allCollections = this.collections.getValue();
-    const collection = allCollections.get(collectionId);
+    const collection = this.collections.get(collectionId);
 
-    return collection && collection.get(docId);
+    return new DocSnapshot(docId, collection && collection.get(docId));
+  }
+
+  getDocOnSnapshot(collectionId: string, docId: string) {
+    if (!this.collections.has(collectionId)) {
+      this.collections.set(collectionId, new MemoryCollection());
+    }
+
+    const collection = this.collections.get(collectionId);
+
+    return collection.changes$.pipe(
+      map(() => this.getDocSnapshot(collectionId, docId))
+    );
   }
 
   getQuerySnapshot(collectionId: string, queryRequest: IQueryRequest) {
-    const allCollections = this.collections.getValue();
-
-    if (!allCollections.has(collectionId)) {
-      return [];
+    if (!this.collections.has(collectionId)) {
+      return new QuerySnapshot([]);
     }
 
     // todo: apply queryRequest
-    return Array.from(allCollections.get(collectionId)).map(([id, doc]) => {
-      return {
-        id,
-        ...doc
-      };
+    const docs = Array.from(this.collections.get(collectionId).docs()).map(([id, docData]) => {
+      return new DocSnapshot(id, docData);
     });
+
+    return new QuerySnapshot(docs);
   }
 }

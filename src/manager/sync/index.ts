@@ -49,9 +49,10 @@ class DefaultDocSyncStrategy implements ISyncStrategy {
       return Promise.resolve(memoryDoc.snapshot());
     }
 
-    return this.remote.collection(this.docQuery.collectionId).doc(this.docQuery.docId).snapshot().then((remoteDoc) => {
-      memoryDoc.update(remoteDoc);
-    });
+    return this.remote.collection(this.docQuery.collectionId).doc(this.docQuery.docId).snapshot()
+      .then((remoteDocSnapshot) => {
+        memoryDoc.update(remoteDocSnapshot.data());
+      });
   }
 }
 
