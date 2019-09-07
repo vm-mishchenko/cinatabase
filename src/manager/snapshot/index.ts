@@ -60,7 +60,8 @@ export class QuerySnapshot {
 
 export class SnapshotServer {
   constructor(private memory: IDatabase,
-              private remoteDb: IDatabase,
+              // todo: remote remote, it does not need for snapshot
+              private remote: IDatabase,
               private syncServer: SyncServer) {
   }
 
@@ -79,13 +80,26 @@ export class SnapshotServer {
     );
   }
 
-  /** Only memory query implemented now. */
   querySnapshot(queryIdentificator: QueryIdentificator,
                 options: IQuerySnapshotOptions = defaultQuerySnapshotOptions
   ): Promise<QuerySnapshot> {
-    const memoryCollection = this.memory.collection(queryIdentificator.collectionId);
+    if (options.source === 'memory') {
+      const memoryCollection = this.memory.collection(queryIdentificator.collectionId);
 
-    return Promise.resolve(memoryCollection.query(queryIdentificator.queryRequest).snapshot());
+      return Promise.resolve(memoryCollection.query(queryIdentificator.queryRequest).snapshot());
+    } else if (options.source === 'remote') {
+      // sync service sync docs then cache synced doc ids and returns them
+      return this.syncServer.syncQuery(queryIdentificator).then((docIds) => {
+        // todo: in future memory database should return docs
+        const syncedDocs = this.memory.collection(queryIdentificator.collectionId).query().snapshot().data().filter((docSnapshot) => {
+          return docIds.includes(docSnapshot.id);
+        });
+
+        return new QuerySnapshot(syncedDocs);
+      });
+    } else {
+      console.warn(`Snapshot does not support "${options.source}" source.`);
+    }
   }
 
   /** Only memory query implemented now. */

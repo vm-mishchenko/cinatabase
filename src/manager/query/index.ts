@@ -30,7 +30,7 @@ export class DocIdentificator implements ITrackableIdentificator {
  * Might represent 0 to N documents withing particular collection
  */
 export class QueryIdentificator implements ITrackableIdentificator {
-  readonly identificator = JSON.stringify(this.queryRequest);
+  readonly identificator = `${this.collectionId}/${JSON.stringify(this.queryRequest)}`;
 
   constructor(readonly collectionId: string, readonly queryRequest: IQueryRequest) {
   }

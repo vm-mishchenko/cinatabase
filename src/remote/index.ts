@@ -3,7 +3,7 @@ import PouchFind from 'pouchdb-find';
 import {BehaviorSubject, Observable, Subject} from 'rxjs';
 import {debounceTime} from 'rxjs/operators';
 import {IQueryRequest} from '../manager/query';
-import {DocSnapshot} from '../manager/snapshot';
+import {DocSnapshot, QuerySnapshot} from '../manager/snapshot';
 
 PouchDB.plugin(PouchFind);
 
@@ -14,6 +14,7 @@ class RemoteDocRef {
   }
 
   update(newData: any) {
+    // todo: provider should care about how to save doc, not remote doc
     return this.getRawDoc().then((rawData) => {
       return this.provider.put({
         ...rawData,
@@ -113,11 +114,13 @@ class RemoteQueryCollectionRef {
         type: this.collectionId
       }
     }).then((result) => {
-      return result.docs.map((rawDoc) => {
-        const {_id, _rev, type, ...doc} = rawDoc;
+      const docs = result.docs.map((rawDoc) => {
+        const {_id, _rev, type, id, ...doc} = rawDoc;
 
-        return doc;
+        return new DocSnapshot(id, doc);
       });
+
+      return new QuerySnapshot(docs);
     });
   }
 }
@@ -141,6 +144,10 @@ class EventManager {
 
 export class InMemoryRemoteProvider {
   private storage = {};
+
+  create(data: any) {
+    return this.put(data);
+  }
 
   put(data: any) {
     this.storage[data._id] = data;
@@ -182,6 +189,7 @@ export class PouchDbRemoteProvider {
   }
 
   put(data: any) {
+    // todo: OMG refactor it!
     if (!this.toUpdate[data._id]) {
       const toUpdatePackage = {};
 
