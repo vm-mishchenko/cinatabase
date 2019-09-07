@@ -4,12 +4,12 @@ import {MemoryDb} from './memory';
 import {InMemoryRemoteProvider, PouchDbRemoteProvider, RemoteDb} from './remote';
 
 // PLAYGROUND
-/*const memoryDb = new MemoryDb();
+const memoryDb = new MemoryDb();
 const remoteDb = new RemoteDb(new InMemoryRemoteProvider());
 const databaseManager = new DatabaseManager(
   memoryDb,
   remoteDb
-);*/
+);
 
 export {
   MemoryDb,

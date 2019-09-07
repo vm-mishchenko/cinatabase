@@ -64,7 +64,7 @@ export class MutateServer {
     const setDocStrategy = new DefaultSetDocStrategy(docIdentificator, newData, this.memory, this.remote);
 
     return setDocStrategy.exec().then(() => {
-      this.syncServer.clearQueryCache();
+      this.syncServer.invalidateQueryCacheForCollection(docIdentificator.collectionId);
     });
   }
 
@@ -77,7 +77,7 @@ export class MutateServer {
       this.remote);
 
     return updateStrategy.exec().then(() => {
-      this.syncServer.clearQueryCache();
+      this.syncServer.invalidateQueryCacheForCollection(docIdentificator.collectionId);
     });
   }
 
@@ -90,7 +90,7 @@ export class MutateServer {
 
     // todo: dont now the right strategy, for now just wait from the both store
     return remoteDoc.remove().then(() => {
-      this.syncServer.clearQueryCache();
+      this.syncServer.invalidateQueryCacheForCollection(docIdentificator.collectionId);
     });
   }
 }

@@ -6,6 +6,45 @@ export interface ISyncOptions {
   force?: boolean;
 }
 
+// map query identificator to docIds
+type ICollectionQueryCache = Map<string, string[]>
+
+class CollectionQueryCacheStorage {
+  // map collectionId to identificator and docIds
+  private cache: Map<string, ICollectionQueryCache> = new Map();
+
+  has(queryIdentificator: QueryIdentificator) {
+    // were queries cached for collection
+    if (!this.cache.has(queryIdentificator.collectionId)) {
+      return false;
+    }
+
+    // is there specific query in collection
+    const collectionQueryCacheMap = this.cache.get(queryIdentificator.collectionId);
+    return collectionQueryCacheMap.has(queryIdentificator.identificator);
+  }
+
+  set(queryIdentificator: QueryIdentificator, docIds: string[]) {
+    if (!this.cache.has(queryIdentificator.collectionId)) {
+      this.cache.set(queryIdentificator.collectionId, new Map());
+    }
+
+    const collectionQueryCacheMap = this.cache.get(queryIdentificator.collectionId);
+
+    collectionQueryCacheMap.set(queryIdentificator.identificator, docIds);
+  }
+
+  get(queryIdentificator: QueryIdentificator): string[] {
+    const collectionQueryCacheMap = this.cache.get(queryIdentificator.collectionId);
+
+    return collectionQueryCacheMap.get(queryIdentificator.identificator);
+  }
+
+  invalidate(collectionId) {
+    this.cache.delete(collectionId);
+  }
+}
+
 export class SyncServer {
   // contains doc identificators
   // todo: find a way to add type for it
@@ -14,7 +53,7 @@ export class SyncServer {
 
   // query identificator to doc id
   // todo: find a way to create type for it for better readability
-  private syncedQueryToDocIdMap: Map<string, string[]> = new Map();
+  private syncedQueryToDocIdMap: CollectionQueryCacheStorage = new CollectionQueryCacheStorage();
 
   constructor(private memory: IDatabase, private remote: IDatabase) {
   }
@@ -58,9 +97,9 @@ export class SyncServer {
    */
   syncQuery(collectionQuery: QueryIdentificator, options?: ISyncOptions): Promise<string[]> {
     // query was already synced before
-    if (this.syncedQueryToDocIdMap.has(collectionQuery.identificator)) {
+    if (this.syncedQueryToDocIdMap.has(collectionQuery)) {
       console.info(`Returns sync from the cache for "${collectionQuery.identificator}"`);
-      return Promise.resolve(this.syncedQueryToDocIdMap.get(collectionQuery.identificator));
+      return Promise.resolve(this.syncedQueryToDocIdMap.get(collectionQuery));
     }
 
     // sync in progress, return promise
@@ -74,7 +113,6 @@ export class SyncServer {
 
     const remoteQuery = remoteCollection.query(collectionQuery.queryRequest);
 
-    console.log(`REAL SYNC`);
     const syncPromise = remoteQuery.snapshot()
       .then((remoteQuerySnapshot) => {
         // update memory database
@@ -84,7 +122,7 @@ export class SyncServer {
 
         // cache remote doc ids against query
         const docIds = remoteQuerySnapshot.docs.map((docSnapshot) => docSnapshot.id);
-        this.syncedQueryToDocIdMap.set(collectionQuery.identificator, docIds);
+        this.syncedQueryToDocIdMap.set(collectionQuery, docIds);
 
         // return synced doc ids for the query
         return docIds;
@@ -100,7 +138,7 @@ export class SyncServer {
     return syncPromise;
   }
 
-  clearQueryCache() {
-    this.syncedQueryToDocIdMap = new Map();
+  invalidateQueryCacheForCollection(collectionId: string) {
+    this.syncedQueryToDocIdMap.invalidate(collectionId);
   }
 }
