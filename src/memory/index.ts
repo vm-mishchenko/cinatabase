@@ -10,7 +10,7 @@ class MemoryDocRef {
   }
 
   isExists() {
-    return false;
+    return this.memoryDb.isDocExist(this.docIdentificator);
   }
 
   set(newData: any) {
@@ -19,6 +19,10 @@ class MemoryDocRef {
 
   update(newData: any) {
     this.memoryDb.updateDoc(this.collectionId, this.docId, newData);
+  }
+
+  remove() {
+    this.memoryDb.removeDoc(this.collectionId, this.docId);
   }
 
   snapshot() {
@@ -52,9 +56,11 @@ class MemoryQueryCollectionRef {
   snapshot() {
     return this.memoryDb.getQuerySnapshot(this.collectionId, this.queryRequest);
   }
-}
 
-type MemoryCollectionData = Map<string, any>;
+  onSnapshot() {
+    return this.memoryDb.getOnQuerySnapshot(this.collectionId, this.queryRequest);
+  }
+}
 
 class MemoryCollection {
   private internalDocs: BehaviorSubject<Map<string, any>> = new BehaviorSubject(new Map());
@@ -75,6 +81,14 @@ class MemoryCollection {
 
   has(docId: string) {
     return this.internalDocs.getValue().has(docId);
+  }
+
+  remove(docId: string) {
+    const docs = this.internalDocs.getValue();
+
+    docs.delete(docId);
+
+    this.internalDocs.next(new Map(docs));
   }
 
   docs() {
@@ -119,6 +133,16 @@ export class MemoryDb {
     collection.set(docId, newDocData);
   }
 
+  removeDoc(collectionId: string, docId: string) {
+    if (!this.collections.has(collectionId)) {
+      return;
+    }
+
+    const collection = this.collections.get(collectionId);
+
+    return collection && collection.remove(docId);
+  }
+
   getDocSnapshot(collectionId: string, docId: string) {
     const collection = this.collections.get(collectionId);
 
@@ -148,5 +172,23 @@ export class MemoryDb {
     });
 
     return new QuerySnapshot(docs);
+  }
+
+  getOnQuerySnapshot(collectionId: string, queryRequest: IQueryRequest) {
+    if (!this.collections.has(collectionId)) {
+      this.collections.set(collectionId, new MemoryCollection());
+    }
+
+    const collection = this.collections.get(collectionId);
+
+    return collection.changes$.pipe(
+      map(() => this.getQuerySnapshot(collectionId, queryRequest))
+    );
+  }
+
+  isDocExist(docIdentificator: DocIdentificator) {
+    const collection = this.collections.get(docIdentificator.collectionId);
+
+    return Boolean(collection && collection.get(docIdentificator.docId));
   }
 }

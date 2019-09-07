@@ -1,5 +1,4 @@
-import {MemoryDb} from '../../memory';
-import {RemoteDb} from '../../remote';
+import {IDatabase} from '../database';
 import {DocIdentificator} from '../query';
 
 export interface IUpdateDocOptions {
@@ -9,17 +8,16 @@ export interface IUpdateDocOptions {
 class DefaultSetDocStrategy {
   constructor(private docIdentificator: DocIdentificator,
               private newData: any,
-              private memory: MemoryDb,
-              private remote: RemoteDb) {
+              private memory: IDatabase,
+              private remote: IDatabase) {
   }
 
   exec() {
     // Default strategy does not know cache strategies for underlying storage.
     // It runs all in parallel.
-    return Promise.all([
-      this.memory.doc(this.docIdentificator.collectionId, this.docIdentificator.docId).set(this.newData),
-      this.remote.doc(this.docIdentificator.collectionId, this.docIdentificator.docId).set(this.newData)
-    ]);
+
+    this.memory.doc(this.docIdentificator.collectionId, this.docIdentificator.docId).set(this.newData);
+    return this.remote.doc(this.docIdentificator.collectionId, this.docIdentificator.docId).set(this.newData);
   }
 }
 
@@ -27,26 +25,29 @@ class DefaultUpdateDocStrategy {
   constructor(private docIdentificator: DocIdentificator,
               private newData: any,
               private options: IUpdateDocOptions = {},
-              private memory: MemoryDb,
-              private remote: RemoteDb) {
+              private memory: IDatabase,
+              private remote: IDatabase) {
   }
 
   exec() {
     // Default strategy does not know cache strategies for underlying storage.
     // It runs all in parallel.
-    const memoryDoc = this.memory.doc(this.docIdentificator.collectionId, this.docIdentificator.docId);
-    const remoteDoc = this.remote.doc(this.docIdentificator.collectionId, this.docIdentificator.docId);
+    const memoryDoc = this.memory.collection(this.docIdentificator.collectionId).doc(this.docIdentificator.docId);
+    const remoteDoc = this.remote.collection(this.docIdentificator.collectionId).doc(this.docIdentificator.docId);
+
+    // update memory doc in a sync manner
+    memoryDoc.update(this.newData);
 
     return remoteDoc.isExist().then(() => {
-      memoryDoc.update(this.newData);
       remoteDoc.update(this.newData);
     }, (error) => {
       if (this.options.createDocIfNotExist) {
-        memoryDoc.set(this.newData);
         remoteDoc.set(this.newData);
-
         return Promise.resolve();
       }
+
+      // remove since doc is not exists
+      memoryDoc.remove();
 
       return Promise.reject(error);
     });
@@ -54,10 +55,10 @@ class DefaultUpdateDocStrategy {
 }
 
 export class MutateServer {
-  constructor(private memory: MemoryDb, private remote: RemoteDb) {
+  constructor(private memory: IDatabase, private remote: IDatabase) {
   }
 
-  setDocData(docIdentificator: DocIdentificator, newData) {
+  setDocData(docIdentificator: DocIdentificator, newData): Promise<any> {
     const setDocStrategy = new DefaultSetDocStrategy(docIdentificator, newData, this.memory, this.remote);
 
     return setDocStrategy.exec();
@@ -72,5 +73,16 @@ export class MutateServer {
       this.remote);
 
     return updateStrategy.exec();
+  }
+
+  removeDocData(docIdentificator: DocIdentificator) {
+    const memoryDoc = this.memory.doc(docIdentificator.collectionId, docIdentificator.docId);
+    const remoteDoc = this.remote.doc(docIdentificator.collectionId, docIdentificator.docId);
+
+    // remote from memory in a sync manner
+    memoryDoc.remove();
+
+    // todo: dont now the right strategy, for now just wait from the both store
+    return remoteDoc.remove();
   }
 }

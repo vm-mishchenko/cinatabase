@@ -1,5 +1,3 @@
-import {MemoryDb} from '../../memory';
-import {RemoteDb} from '../../remote';
 import {IUpdateDocOptions, MutateServer} from '../mutate';
 import {DocIdentificator, IQueryRequest, QueryIdentificator} from '../query';
 import {IQuerySnapshotOptions, SnapshotServer} from '../snapshot';
@@ -51,9 +49,15 @@ export class DocRef {
 
   // check whether it exists in the remote store
   isExists() {
-    this.snapshotServer.docSnapshot(this.docIdentificator).then((snapshot) => {
+    return this.snapshotServer.docSnapshot(this.docIdentificator).then((snapshot) => {
       return snapshot.exists ? Promise.resolve() : Promise.reject();
     });
+  }
+
+  remove() {
+    return this.mutateServer.removeDocData(
+      this.docIdentificator,
+    );
   }
 }
 
@@ -73,18 +77,19 @@ class CollectionQueryRef {
   }
 
   sync(options: ISyncOptions = {}) {
-    const query = new QueryIdentificator(this.collectionId, {});
-
-    return this.syncServer.syncQuery(query, options);
+    return this.syncServer.syncQuery(this.queryIdentificator(), options);
   }
 
   snapshot(options?: IQuerySnapshotOptions) {
     return this.snapshotServer.querySnapshot(this.queryIdentificator(), options);
   }
 
-  queryIdentificator() {
-    // todo: need to implement
-    return new QueryIdentificator(this.collectionId, {});
+  onSnapshot(options?: IQuerySnapshotOptions) {
+    return this.snapshotServer.queryOnSnapshot(this.queryIdentificator(), options);
+  }
+
+  private queryIdentificator() {
+    return new QueryIdentificator(this.collectionId, this.queryRequest);
   }
 }
 
@@ -104,13 +109,19 @@ export class CollectionRef {
   }
 }
 
+export interface IDatabase {
+  doc(collectionId: string, docId: string);
+
+  collection(collectionId: string);
+}
+
 export class DatabaseManager {
   private defaultCollectionId = 'DEFAULT_COLLECTION_ID';
   private syncServer = new SyncServer(this.memory, this.remote);
   private mutateServer = new MutateServer(this.memory, this.remote);
   private snapshotServer = new SnapshotServer(this.memory, this.remote, this.syncServer);
 
-  constructor(private memory: MemoryDb, private remote: RemoteDb) {
+  constructor(private memory: IDatabase, private remote: IDatabase) {
   }
 
   doc(docId: string) {

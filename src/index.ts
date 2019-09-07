@@ -1,10 +1,11 @@
-import {DatabaseManager} from './manager/database';
+import {CollectionRef, DatabaseManager, DocRef} from './manager/database';
+import {DocSnapshot, QuerySnapshot} from './manager/snapshot';
 import {MemoryDb} from './memory';
-import {RemoteDb} from './remote';
+import {InMemoryRemoteProvider, PouchDbRemoteProvider, RemoteDb} from './remote';
 
 // CLIENT
 const memoryDb = new MemoryDb();
-const remoteDb = new RemoteDb();
+const remoteDb = new RemoteDb(new InMemoryRemoteProvider());
 const databaseManager = new DatabaseManager(
   memoryDb,
   remoteDb
@@ -18,7 +19,13 @@ const databaseManager = new DatabaseManager(
 export {
   MemoryDb,
   RemoteDb,
-  DatabaseManager
+  DatabaseManager,
+  InMemoryRemoteProvider,
+  PouchDbRemoteProvider,
+  DocRef,
+  CollectionRef,
+  DocSnapshot,
+  QuerySnapshot
 };
 
 // use case 1.1: two identical parallel sync request, one one should be executed
@@ -37,12 +44,12 @@ Promise.all([
 });*/
 
 // use case 2.1: should not call remote server for the sync if query or doc was previously synced
-/*const initialSync = databaseManager.collection('users').doc('admin').sync();
-initialSync.then(() => {
-  databaseManager.collection('users').doc('admin').sync().then(() => {
-    console.log('synced');
-  });
-});*/
+// const initialSync = databaseManager.collection('users').doc('admin').sync();
+// initialSync.then(() => {
+//   databaseManager.collection('users').doc('admin').sync().then(() => {
+//     console.log('synced');
+//   });
+// });
 
 // use case 2.2: force to sync even if query or doc was previously synced
 /*const initialSync = databaseManager.collection('users').doc('admin').sync();

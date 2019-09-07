@@ -1,22 +1,21 @@
 import PouchDB from 'pouchdb';
 import PouchFind from 'pouchdb-find';
-import {Observable, Subject} from 'rxjs';
+import {BehaviorSubject, Observable, Subject} from 'rxjs';
+import {debounceTime} from 'rxjs/operators';
 import {IQueryRequest} from '../manager/query';
 import {DocSnapshot} from '../manager/snapshot';
 
 PouchDB.plugin(PouchFind);
 
-const POUCH_STORAGE_LOCAL_DB_NAME_KEY = 'pouchdb-storage:local-database-name';
-
 class RemoteDocRef {
   private databaseDocId = `${this.collectionId}:${this.docId}`;
 
-  constructor(private collectionId: string, private docId: string, private database: any) {
+  constructor(private collectionId: string, private docId: string, private provider: any) {
   }
 
   update(newData: any) {
     return this.getRawDoc().then((rawData) => {
-      return this.database.put({
+      return this.provider.put({
         ...rawData,
         ...newData
       });
@@ -28,17 +27,20 @@ class RemoteDocRef {
       const {id, ...docData} = this.extractDoc(rawDoc);
 
       return new DocSnapshot(id, docData);
+    }, () => {
+      // doc does not exist
+      return new DocSnapshot(this.docId, undefined);
     });
   }
 
-  /** Create new doc if doesn't exist and set data*/
+  /** Create new doc if doesn't exist and set data */
   set(newData) {
     return this.isExist().then(() => {
       return this.getRawDoc().then((rawData) => {
         const {_id, type, id, _rev, ...previousData} = rawData;
 
         // rewrite any previous data
-        return this.database.put({
+        return this.provider.put({
           _id,
           _rev,
           id,
@@ -55,6 +57,12 @@ class RemoteDocRef {
     return this.getRawDoc().then(() => true);
   }
 
+  remove() {
+    return this.getRawDoc().then((rawData) => {
+      return this.provider.remove(rawData);
+    });
+  }
+
   private createNew(newData: any) {
     const data = {
       _id: this.databaseDocId,
@@ -63,11 +71,11 @@ class RemoteDocRef {
       ...newData
     };
 
-    return this.database.put(data);
+    return this.provider.create(data);
   }
 
   private getRawDoc(): Promise<any> {
-    return this.database.get(this.databaseDocId);
+    return this.provider.get(this.databaseDocId);
   }
 
   private extractDoc(rawDoc) {
@@ -78,29 +86,30 @@ class RemoteDocRef {
 }
 
 class RemoteCollectionRef {
-  constructor(private collectionId: string, private database: any) {
+  constructor(private collectionId: string, private provider: any) {
   }
 
   doc(docId: string) {
-    return new RemoteDocRef(this.collectionId, docId, this.database);
+    return new RemoteDocRef(this.collectionId, docId, this.provider);
   }
 
   query(query: IQueryRequest = {}) {
-    return new RemoteQueryCollectionRef(this.collectionId, query, this.database);
+    return new RemoteQueryCollectionRef(this.collectionId, query, this.provider);
   }
 }
 
 class RemoteQueryCollectionRef {
-  constructor(private collectionId: string, private query: IQueryRequest, private database: any) {
+  constructor(private collectionId: string, private query: IQueryRequest, private provider: any) {
   }
 
   update() {
+    return Promise.resolve();
   }
 
   snapshot() {
-    return this.database.find({
+    return this.provider.find({
       selector: {
-        selector: {},
+        ...this.query,
         type: this.collectionId
       }
     }).then((result) => {
@@ -130,41 +139,123 @@ class EventManager {
   }
 }
 
+export class InMemoryRemoteProvider {
+  private storage = {};
+
+  put(data: any) {
+    this.storage[data._id] = data;
+
+    return Promise.resolve();
+  }
+
+  get(id: string) {
+    if (!this.storage[id]) {
+      return Promise.reject();
+    }
+
+    return Promise.resolve(this.storage[id]);
+  }
+
+  find(query: any) {
+    const docs = Object.values(this.storage).filter((doc: any) => {
+      return doc.type === query.selector.type;
+    });
+
+    return Promise.resolve(docs);
+  }
+
+  remove(data: any) {
+    delete this.storage[data._id];
+
+    return Promise.resolve();
+  }
+}
+
+export class PouchDbRemoteProvider {
+  private pouch: any = new PouchDB(this.dbName, {auto_compaction: true});
+
+  private queue: Promise<any> = Promise.resolve();
+
+  private toUpdate = {};
+
+  constructor(private dbName: string) {
+  }
+
+  put(data: any) {
+    if (!this.toUpdate[data._id]) {
+      const toUpdatePackage = {};
+
+      const subject = (new BehaviorSubject(data)).pipe(
+        debounceTime(300)
+      );
+
+      toUpdatePackage['subject'] = subject;
+
+      toUpdatePackage['subscription'] = subject.subscribe((data: any) => {
+        const resolve = this.toUpdate[data._id].resolve;
+        const reject = this.toUpdate[data._id].reject;
+
+        this.toUpdate[data._id].subscription.unsubscribe();
+        this.toUpdate[data._id] = null;
+
+        this.queue = this.queue.then(() => {
+          return this.pouch.get(data._id).then((doc: any) => {
+            const {_rev, ...newData} = data;
+
+            this.pouch.put({
+              ...doc,
+              ...newData
+            }).then(resolve, reject);
+          });
+        });
+      });
+
+      toUpdatePackage['promise'] = new Promise((resolve, reject) => {
+        toUpdatePackage['resolve'] = resolve;
+        toUpdatePackage['reject'] = reject;
+      });
+
+      this.toUpdate[data._id] = toUpdatePackage;
+    } else {
+      this.toUpdate[data._id].subject.next(data);
+    }
+
+    return this.toUpdate[data._id].promise;
+  }
+
+  create(data) {
+    return this.pouch.put(data);
+  }
+
+  get(id: string) {
+    return this.pouch.get(id);
+  }
+
+  find(query: any) {
+    return this.pouch.find(query);
+  }
+
+  remove(data: string) {
+    return this.pouch.remove(data);
+  }
+}
+
 export class RemoteDb {
   events$: Observable<any>;
-  private database: any;
   private readonly api: RemoteAPI;
   private readonly eventManager: EventManager;
 
-  constructor() {
+  constructor(private provider: any) {
     this.eventManager = new EventManager();
     this.api = new RemoteAPI(this.eventManager);
     this.events$ = this.eventManager.events$;
-
-    this.initializeDatabase();
   }
 
   doc(collectionId: string, docId: string) {
-    return new RemoteDocRef(collectionId, docId, this.database);
+    return new RemoteDocRef(collectionId, docId, this.provider);
   }
 
   collection(collectionId: string) {
-    return new RemoteCollectionRef(collectionId, this.database);
-  }
-
-  private initializeDatabase() {
-    let localDbName = localStorage.getItem(POUCH_STORAGE_LOCAL_DB_NAME_KEY);
-
-    if (!localDbName) {
-      localDbName = this.getLocalDbName();
-      localStorage.setItem(POUCH_STORAGE_LOCAL_DB_NAME_KEY, localDbName);
-    }
-
-    // todo: set auto_compaction for true, but need more investigation
-    this.database = new PouchDB(localDbName, {auto_compaction: true});
-  }
-
-  private getLocalDbName(): string {
-    return String(Date.now());
+    return new RemoteCollectionRef(collectionId, this.provider);
   }
 }
