@@ -168,7 +168,7 @@ export class InMemoryRemoteProvider {
       return doc.type === query.selector.type;
     });
 
-    return Promise.resolve(docs);
+    return Promise.resolve({docs});
   }
 
   remove(data: any) {

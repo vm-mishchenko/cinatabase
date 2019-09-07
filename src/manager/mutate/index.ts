@@ -1,5 +1,6 @@
 import {IDatabase} from '../database';
 import {DocIdentificator} from '../query';
+import {SyncServer} from '../sync';
 
 export interface IUpdateDocOptions {
   createDocIfNotExist?: boolean;
@@ -55,13 +56,16 @@ class DefaultUpdateDocStrategy {
 }
 
 export class MutateServer {
-  constructor(private memory: IDatabase, private remote: IDatabase) {
+  constructor(private memory: IDatabase, private remote: IDatabase,
+              private syncServer: SyncServer) {
   }
 
   setDocData(docIdentificator: DocIdentificator, newData): Promise<any> {
     const setDocStrategy = new DefaultSetDocStrategy(docIdentificator, newData, this.memory, this.remote);
 
-    return setDocStrategy.exec();
+    return setDocStrategy.exec().then(() => {
+      this.syncServer.clearQueryCache();
+    });
   }
 
   updateDocData(docIdentificator: DocIdentificator, newData, options?: IUpdateDocOptions) {
@@ -72,7 +76,9 @@ export class MutateServer {
       this.memory,
       this.remote);
 
-    return updateStrategy.exec();
+    return updateStrategy.exec().then(() => {
+      this.syncServer.clearQueryCache();
+    });
   }
 
   removeDocData(docIdentificator: DocIdentificator) {
@@ -83,6 +89,8 @@ export class MutateServer {
     memoryDoc.remove();
 
     // todo: dont now the right strategy, for now just wait from the both store
-    return remoteDoc.remove();
+    return remoteDoc.remove().then(() => {
+      this.syncServer.clearQueryCache();
+    });
   }
 }

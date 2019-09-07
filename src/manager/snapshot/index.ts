@@ -10,7 +10,7 @@ export interface IQuerySnapshotOptions {
 }
 
 const defaultQuerySnapshotOptions = {
-  source: 'memory'
+  source: 'remote'
 };
 
 export class DocSnapshot {

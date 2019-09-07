@@ -74,6 +74,7 @@ export class SyncServer {
 
     const remoteQuery = remoteCollection.query(collectionQuery.queryRequest);
 
+    console.log(`REAL SYNC`);
     const syncPromise = remoteQuery.snapshot()
       .then((remoteQuerySnapshot) => {
         // update memory database
@@ -97,5 +98,9 @@ export class SyncServer {
 
     // clean doc operation after
     return syncPromise;
+  }
+
+  clearQueryCache() {
+    this.syncedQueryToDocIdMap = new Map();
   }
 }

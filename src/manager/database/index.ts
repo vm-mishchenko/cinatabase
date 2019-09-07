@@ -118,7 +118,7 @@ export interface IDatabase {
 export class DatabaseManager {
   private defaultCollectionId = 'DEFAULT_COLLECTION_ID';
   private syncServer = new SyncServer(this.memory, this.remote);
-  private mutateServer = new MutateServer(this.memory, this.remote);
+  private mutateServer = new MutateServer(this.memory, this.remote, this.syncServer);
   private snapshotServer = new SnapshotServer(this.memory, this.remote, this.syncServer);
 
   constructor(private memory: IDatabase, private remote: IDatabase) {
