@@ -1,4 +1,4 @@
-import {IDatabase} from '../database';
+import {IMemoryDatabase, IRemoteDatabase} from '../database';
 import {DocIdentificator, QueryIdentificator} from '../query';
 
 export interface ISyncOptions {
@@ -48,14 +48,49 @@ class CollectionQueryCacheStorage {
 export class SyncServer {
   // contains doc identificators
   // todo: find a way to add type for it
-  private syncedDoc: Set<string> = new Set();
+  private syncedDoc: Map<string, DocIdentificator> = new Map();
   private syncInProgress: Map<string, Promise<any>> = new Map();
 
   // query identificator to doc id
   // todo: find a way to create type for it for better readability
   private syncedQueryToDocIdMap: CollectionQueryCacheStorage = new CollectionQueryCacheStorage();
 
-  constructor(private memory: IDatabase, private remote: IDatabase) {
+  // store all queries which client requested during the session
+  // we cannot use syncedQueryToDocIdMap because it is cleared after mutate operation
+  // map query unique identificator to the QueryIdentificator
+  private sessionUniqueQueryIdentificators: Map<string, QueryIdentificator> = new Map();
+
+  constructor(private memory: IMemoryDatabase, private remote: IRemoteDatabase) {
+  }
+
+  // sync with remote server
+  syncWithServer() {
+    // todo: in future I need to wait for all sync and mutate operations
+    return this.remote.syncWithServer().then(() => {
+      const sessionUniqueQueryIdentificators = this.sessionUniqueQueryIdentificators.values();
+      // invalidate all sync service cache
+      this.invalidate();
+
+      // re-sync every doc which is stored in memory collection. If doc still exists in remote
+      // it will be updated in memory, if not it will be deleted
+      const collectionsPromises = this.memory.collections().map((collection) => {
+        const docPromises = collection.query().snapshot().data().map((docSnapshot) => {
+          return this.syncDoc(new DocIdentificator(collection.collectionId, docSnapshot.id));
+        });
+
+        return Promise.all(docPromises);
+      });
+
+      return Promise.all(collectionsPromises).then(() => {
+        // sync all queries which client requested before sync with server.
+        // It may add additional docs to the memory.
+        const syncAllQueryPromise = Array.from(sessionUniqueQueryIdentificators).map((queryIdentificator) => {
+          return this.syncQuery(queryIdentificator);
+        });
+
+        return syncAllQueryPromise;
+      });
+    });
   }
 
   syncDoc(docIdentificator: DocIdentificator, options: ISyncOptions = {}) {
@@ -71,6 +106,8 @@ export class SyncServer {
           memoryDoc.set(remoteDocSnapshot.data());
         } else {
           console.warn(`Sync failed no remote doc "${docIdentificator.collectionId}/${docIdentificator.docId}"`);
+          // remote memory doc if such does not exists in remote storage
+          memoryDoc.remove();
 
           // sync is failed because remote doc does not exists
           // but for the client perspective sync is finished
@@ -81,7 +118,7 @@ export class SyncServer {
         // mark all sync as completed, even when there were no remote doc
         // any mutate operations eventually adds doc to memory and remote storage later
         this.syncInProgress.delete(docIdentificator.identificator);
-        this.syncedDoc.add(docIdentificator.identificator);
+        this.syncedDoc.set(docIdentificator.identificator, docIdentificator);
       });
 
     // cache sync operation based on query representation
@@ -96,6 +133,12 @@ export class SyncServer {
    * @return Array of doc ids which were synced with memory store for particular query
    */
   syncQuery(collectionQuery: QueryIdentificator, options?: ISyncOptions): Promise<string[]> {
+    // store all unique query requested during the session, will use it after sync with remote store
+    // to update memory db
+    if (!this.sessionUniqueQueryIdentificators.has(collectionQuery.identificator)) {
+      this.sessionUniqueQueryIdentificators.set(collectionQuery.identificator, collectionQuery);
+    }
+
     // query was already synced before
     if (this.syncedQueryToDocIdMap.has(collectionQuery)) {
       console.info(`Returns sync from the cache for "${collectionQuery.identificator}"`);
@@ -107,6 +150,8 @@ export class SyncServer {
       console.warn(`Double sync for "${collectionQuery.identificator}" identificator.`);
       return this.syncInProgress.get(collectionQuery.identificator);
     }
+
+    console.info(`New query sync for "${collectionQuery.identificator}"`);
 
     const memoryCollection = this.memory.collection(collectionQuery.collectionId);
     const remoteCollection = this.remote.collection(collectionQuery.collectionId);
@@ -138,6 +183,11 @@ export class SyncServer {
     return syncPromise;
   }
 
+  invalidate() {
+    this.syncedDoc = new Map();
+    this.syncedQueryToDocIdMap = new CollectionQueryCacheStorage();
+  }
+  
   invalidateQueryCacheForCollection(collectionId: string) {
     this.syncedQueryToDocIdMap.invalidate(collectionId);
   }

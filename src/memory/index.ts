@@ -35,7 +35,7 @@ class MemoryDocRef {
 }
 
 class MemoryCollectionRef {
-  constructor(private collectionId: string, private memoryDb: MemoryDb) {
+  constructor(readonly collectionId: string, private memoryDb: MemoryDb) {
   }
 
   doc(docId: string) {
@@ -91,13 +91,17 @@ class MemoryCollection {
     this.internalDocs.next(new Map(docs));
   }
 
+  removeAll() {
+    this.internalDocs.next(new Map());
+  }
+
   docs() {
     return this.internalDocs.getValue();
   }
 }
 
 export class MemoryDb {
-  private collections: Map<string, MemoryCollection> = new Map();
+  private innerCollections: Map<string, MemoryCollection> = new Map();
 
   doc(collectionId: string, docId: string) {
     return new MemoryDocRef(collectionId, docId, this);
@@ -107,23 +111,29 @@ export class MemoryDb {
     return new MemoryCollectionRef(collectionId, this);
   }
 
+  collections() {
+    return Array.from(this.innerCollections.keys()).map((collectinId) => {
+      return this.collection(collectinId);
+    });
+  }
+
   // todo: should be hidden later under the internal API
   setDoc(docIdentificator: DocIdentificator, newData: any) {
-    if (!this.collections.has(docIdentificator.collectionId)) {
-      this.collections.set(docIdentificator.collectionId, new MemoryCollection());
+    if (!this.innerCollections.has(docIdentificator.collectionId)) {
+      this.innerCollections.set(docIdentificator.collectionId, new MemoryCollection());
     }
 
-    const collection = this.collections.get(docIdentificator.collectionId);
+    const collection = this.innerCollections.get(docIdentificator.collectionId);
 
     collection.set(docIdentificator.docId, newData);
   }
 
   updateDoc(collectionId: string, docId: string, data: any) {
-    if (!this.collections.has(collectionId)) {
-      this.collections.set(collectionId, new MemoryCollection());
+    if (!this.innerCollections.has(collectionId)) {
+      this.innerCollections.set(collectionId, new MemoryCollection());
     }
 
-    const collection = this.collections.get(collectionId);
+    const collection = this.innerCollections.get(collectionId);
     const previousDocData = collection.get(docId) || {};
     const newDocData = {
       ...previousDocData,
@@ -134,27 +144,27 @@ export class MemoryDb {
   }
 
   removeDoc(collectionId: string, docId: string) {
-    if (!this.collections.has(collectionId)) {
+    if (!this.innerCollections.has(collectionId)) {
       return;
     }
 
-    const collection = this.collections.get(collectionId);
+    const collection = this.innerCollections.get(collectionId);
 
     return collection && collection.remove(docId);
   }
 
   getDocSnapshot(collectionId: string, docId: string) {
-    const collection = this.collections.get(collectionId);
+    const collection = this.innerCollections.get(collectionId);
 
     return new DocSnapshot(docId, collection && collection.get(docId));
   }
 
   getDocOnSnapshot(collectionId: string, docId: string) {
-    if (!this.collections.has(collectionId)) {
-      this.collections.set(collectionId, new MemoryCollection());
+    if (!this.innerCollections.has(collectionId)) {
+      this.innerCollections.set(collectionId, new MemoryCollection());
     }
 
-    const collection = this.collections.get(collectionId);
+    const collection = this.innerCollections.get(collectionId);
 
     return collection.changes$.pipe(
       map(() => this.getDocSnapshot(collectionId, docId))
@@ -162,12 +172,12 @@ export class MemoryDb {
   }
 
   getQuerySnapshot(collectionId: string, queryRequest: IQueryRequest) {
-    if (!this.collections.has(collectionId)) {
+    if (!this.innerCollections.has(collectionId)) {
       return new QuerySnapshot([]);
     }
 
     // todo: apply queryRequest
-    const docs = Array.from(this.collections.get(collectionId).docs()).map(([id, docData]) => {
+    const docs = Array.from(this.innerCollections.get(collectionId).docs()).map(([id, docData]) => {
       return new DocSnapshot(id, docData);
     });
 
@@ -175,11 +185,11 @@ export class MemoryDb {
   }
 
   getOnQuerySnapshot(collectionId: string, queryRequest: IQueryRequest) {
-    if (!this.collections.has(collectionId)) {
-      this.collections.set(collectionId, new MemoryCollection());
+    if (!this.innerCollections.has(collectionId)) {
+      this.innerCollections.set(collectionId, new MemoryCollection());
     }
 
-    const collection = this.collections.get(collectionId);
+    const collection = this.innerCollections.get(collectionId);
 
     return collection.changes$.pipe(
       map(() => this.getQuerySnapshot(collectionId, queryRequest))
@@ -187,8 +197,16 @@ export class MemoryDb {
   }
 
   isDocExist(docIdentificator: DocIdentificator) {
-    const collection = this.collections.get(docIdentificator.collectionId);
+    const collection = this.innerCollections.get(docIdentificator.collectionId);
 
     return Boolean(collection && collection.get(docIdentificator.docId));
   }
+
+  removeAllData() {
+    Array.from(this.innerCollections.values()).forEach((collection) => {
+      collection.removeAll();
+    });
+  }
+
+
 }

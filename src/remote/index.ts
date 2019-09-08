@@ -2,6 +2,7 @@ import PouchDB from 'pouchdb';
 import PouchFind from 'pouchdb-find';
 import {BehaviorSubject, Observable, Subject} from 'rxjs';
 import {debounceTime} from 'rxjs/operators';
+import {IRemoteDatabase} from '../manager/database';
 import {IQueryRequest} from '../manager/query';
 import {DocSnapshot, QuerySnapshot} from '../manager/snapshot';
 
@@ -176,6 +177,11 @@ export class InMemoryRemoteProvider {
 
     return Promise.resolve();
   }
+
+  syncWithServer() {
+    // memory does not have server
+    return Promise.resolve();
+  }
 }
 
 export class PouchDbRemoteProvider {
@@ -185,7 +191,7 @@ export class PouchDbRemoteProvider {
 
   private toUpdate = {};
 
-  constructor(private dbName: string) {
+  constructor(private dbName: string, private remoteDatabaseUrl?: string) {
   }
 
   put(data: any) {
@@ -206,6 +212,7 @@ export class PouchDbRemoteProvider {
         this.toUpdate[data._id].subscription.unsubscribe();
         this.toUpdate[data._id] = null;
 
+        // todo: I dont think that I need to wait for the previous execution - try to delete it
         this.queue = this.queue.then(() => {
           return this.pouch.get(data._id).then((doc: any) => {
             const {_rev, ...newData} = data;
@@ -246,9 +253,25 @@ export class PouchDbRemoteProvider {
   remove(data: string) {
     return this.pouch.remove(data);
   }
+
+  configure(config) {
+    if (config && config.remoteDatabaseUrl) {
+      this.remoteDatabaseUrl = config.remoteDatabaseUrl;
+    }
+  }
+
+  syncWithServer() {
+    const remotePouchDb = new PouchDB(this.remoteDatabaseUrl);
+
+    return new Promise((resolve, reject) => {
+      this.pouch.sync(remotePouchDb)
+        .on('complete', resolve)
+        .on('error', reject);
+    });
+  }
 }
 
-export class RemoteDb {
+export class RemoteDb implements IRemoteDatabase {
   events$: Observable<any>;
   private readonly api: RemoteAPI;
   private readonly eventManager: EventManager;
@@ -265,5 +288,14 @@ export class RemoteDb {
 
   collection(collectionId: string) {
     return new RemoteCollectionRef(collectionId, this.provider);
+  }
+
+  syncWithServer() {
+    return this.provider.syncWithServer();
+  }
+
+  removeAllData() {
+    // todo: need to implement
+    return Promise.resolve();
   }
 }

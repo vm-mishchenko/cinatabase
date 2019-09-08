@@ -113,6 +113,17 @@ export interface IDatabase {
   doc(collectionId: string, docId: string);
 
   collection(collectionId: string);
+
+  removeAllData();
+}
+
+export interface IMemoryDatabase extends IDatabase {
+  // todo: need to define interface for inner databases entiites (memory/remote doc, collection)
+  collections(): any[];
+}
+
+export interface ISyncableDatabase {
+  syncWithServer(): Promise<any>;
 }
 
 export class DatabaseManager {
@@ -121,7 +132,7 @@ export class DatabaseManager {
   private mutateServer = new MutateServer(this.memory, this.remote, this.syncServer);
   private snapshotServer = new SnapshotServer(this.memory, this.remote, this.syncServer);
 
-  constructor(private memory: IDatabase, private remote: IDatabase) {
+  constructor(private memory: IMemoryDatabase, private remote: IRemoteDatabase) {
   }
 
   doc(docId: string) {
@@ -130,5 +141,10 @@ export class DatabaseManager {
 
   collection(id) {
     return new CollectionRef(id, this.syncServer, this.mutateServer, this.snapshotServer);
+  }
+
+  // sync database with remote server
+  syncWithServer() {
+    return this.syncServer.syncWithServer();
   }
 }
