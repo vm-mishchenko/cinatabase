@@ -11,8 +11,6 @@ const databaseManager = new DatabaseManager(
   remoteDb
 );
 
-databaseManager;
-
 export {
   MemoryDb,
   RemoteDb,

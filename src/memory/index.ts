@@ -203,7 +203,7 @@ export class MemoryDb {
   }
 
   removeAllData() {
-    // it's important to keep collection instance, since it stores the client's subscription 
+    // it's important to keep collection instance, since it stores the client's subscription
     Array.from(this.innerCollections.values()).forEach((collection) => {
       collection.removeAll();
     });

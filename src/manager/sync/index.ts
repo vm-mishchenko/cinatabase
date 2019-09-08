@@ -2,8 +2,16 @@ import {IMemoryDatabase, IRemoteDatabase} from '../database';
 import {DocIdentificator, QueryIdentificator} from '../query';
 
 export interface ISyncOptions {
-  /** sync despite the fact that query was previously synced */
+  /** Sync even if the doc was previously synced or exists in the memory. */
+  // that's useful after sync with remote server
   force?: boolean;
+
+  /** Removes doc from memory store if doc does not found in remote db. */
+  // Useful after sync with remote server where fresh version of remote store
+  // does not contains memory doc that was previously synced.
+  // During normal usage is not so useful, since doc is added to memory in synchronous mode
+  //  wheres write to memory happen with some delay.
+  removeFromMemory?: boolean;
 }
 
 // map query identificator to docIds
@@ -75,7 +83,10 @@ export class SyncServer {
       // it will be updated in memory, if not it will be deleted
       const collectionsPromises = this.memory.collections().map((collection) => {
         const docPromises = collection.query().snapshot().data().map((docSnapshot) => {
-          return this.syncDoc(new DocIdentificator(collection.collectionId, docSnapshot.id));
+          return this.syncDoc(new DocIdentificator(collection.collectionId, docSnapshot.id), {
+            force: true,
+            removeFromMemory: true
+          });
         });
 
         return Promise.all(docPromises);
@@ -96,8 +107,13 @@ export class SyncServer {
   syncDoc(docIdentificator: DocIdentificator, options: ISyncOptions = {}) {
     const memoryDoc = this.memory.collection(docIdentificator.collectionId).doc(docIdentificator.docId);
 
-    if (this.syncedDoc.has(docIdentificator.identificator)) {
-      return Promise.resolve();
+    if (!options.force) {
+      // doc might exists in memory db but does not present in sync cache
+      // it happens during mutate operations - doc is added to both stores
+      // but "sync" method is not necessary
+      if (this.syncedDoc.has(docIdentificator.identificator) || memoryDoc.isExists()) {
+        return Promise.resolve();
+      }
     }
 
     const syncPromise = this.remote.collection(docIdentificator.collectionId).doc(docIdentificator.docId).snapshot()
@@ -107,7 +123,9 @@ export class SyncServer {
         } else {
           console.warn(`Sync failed no remote doc "${docIdentificator.collectionId}/${docIdentificator.docId}"`);
           // remote memory doc if such does not exists in remote storage
-          memoryDoc.remove();
+          if (options.removeFromMemory) {
+            memoryDoc.remove();
+          }
 
           // sync is failed because remote doc does not exists
           // but for the client perspective sync is finished
