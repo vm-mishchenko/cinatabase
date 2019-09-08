@@ -182,16 +182,23 @@ export class InMemoryRemoteProvider {
     // memory does not have server
     return Promise.resolve();
   }
+
+  removeAllData() {
+    this.storage = {};
+
+    return Promise.resolve();
+  }
 }
 
 export class PouchDbRemoteProvider {
-  private pouch: any = new PouchDB(this.dbName, {auto_compaction: true});
+  private pouch: any;
 
   private queue: Promise<any> = Promise.resolve();
 
   private toUpdate = {};
 
   constructor(private dbName: string, private remoteDatabaseUrl?: string) {
+    this.initializePouch();
   }
 
   put(data: any) {
@@ -260,6 +267,12 @@ export class PouchDbRemoteProvider {
     }
   }
 
+  removeAllData() {
+    return this.pouch.destroy().then(() => {
+      this.initializePouch();
+    });
+  }
+
   syncWithServer() {
     const remotePouchDb = new PouchDB(this.remoteDatabaseUrl);
 
@@ -268,6 +281,10 @@ export class PouchDbRemoteProvider {
         .on('complete', resolve)
         .on('error', reject);
     });
+  }
+
+  initializePouch() {
+    this.pouch = new PouchDB(this.dbName, {auto_compaction: true});
   }
 }
 
@@ -296,6 +313,6 @@ export class RemoteDb implements IRemoteDatabase {
 
   removeAllData() {
     // todo: need to implement
-    return Promise.resolve();
+    this.provider.removeAllData();
   }
 }

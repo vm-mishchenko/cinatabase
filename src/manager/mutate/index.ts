@@ -93,4 +93,10 @@ export class MutateServer {
       this.syncServer.invalidateQueryCacheForCollection(docIdentificator.collectionId);
     });
   }
+
+  removeAllData() {
+    this.syncServer.invalidate();
+    this.memory.removeAllData();
+    return this.remote.removeAllData();
+  }
 }

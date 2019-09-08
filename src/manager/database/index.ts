@@ -122,6 +122,9 @@ export interface IMemoryDatabase extends IDatabase {
   collections(): any[];
 }
 
+export interface IRemoteDatabase extends IDatabase, ISyncableDatabase {
+}
+
 export interface ISyncableDatabase {
   syncWithServer(): Promise<any>;
 }
@@ -146,5 +149,9 @@ export class DatabaseManager {
   // sync database with remote server
   syncWithServer() {
     return this.syncServer.syncWithServer();
+  }
+
+  removeAllData() {
+    this.mutateServer.removeAllData();
   }
 }
