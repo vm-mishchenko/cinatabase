@@ -1,9 +1,11 @@
 import {BehaviorSubject} from 'rxjs';
 import {map, shareReplay} from 'rxjs/operators';
-import {DocIdentificator, IQueryRequest} from '../manager/query';
-import {DocSnapshot, QuerySnapshot} from '../manager/snapshot';
+import {DocIdentificator, IQueryRequest} from '../query';
+import {DocSnapshot, QuerySnapshot} from '../snapshot';
+import {IQuerySnapshot} from '../snapshot/interfaces';
+import {IMemoryCollectionRef, IMemoryDocRef, IMemoryQueryCollectionRef} from './interfaces';
 
-class MemoryDocRef {
+class MemoryDocRef<IDoc> implements IMemoryDocRef<IDoc> {
   private docIdentificator = new DocIdentificator(this.collectionId, this.docId);
 
   constructor(private collectionId: string, private docId: string, private memoryDb: MemoryDb) {
@@ -13,11 +15,11 @@ class MemoryDocRef {
     return this.memoryDb.isDocExist(this.docIdentificator);
   }
 
-  set(newData: any) {
+  set(newData: IDoc) {
     this.memoryDb.setDoc(this.docIdentificator, newData);
   }
 
-  update(newData: any) {
+  update(newData: Partial<IDoc>) {
     this.memoryDb.updateDoc(this.collectionId, this.docId, newData);
   }
 
@@ -26,7 +28,7 @@ class MemoryDocRef {
   }
 
   snapshot() {
-    return this.memoryDb.getDocSnapshot(this.collectionId, this.docId);
+    return this.memoryDb.getDocSnapshot<IDoc>(this.collectionId, this.docId);
   }
 
   onSnapshot() {
@@ -34,27 +36,31 @@ class MemoryDocRef {
   }
 }
 
-class MemoryCollectionRef {
+class MemoryCollectionRef<IDoc> implements IMemoryCollectionRef<IDoc> {
   constructor(readonly collectionId: string, private memoryDb: MemoryDb) {
   }
 
+  foo(foo: IDoc): IDoc {
+    return foo;
+  }
+
   doc(docId: string) {
-    return new MemoryDocRef(this.collectionId, docId, this.memoryDb);
+    return new MemoryDocRef<IDoc>(this.collectionId, docId, this.memoryDb);
   }
 
   query(queryRequest?: IQueryRequest) {
-    return new MemoryQueryCollectionRef(this.collectionId, queryRequest, this.memoryDb);
+    return new MemoryQueryCollectionRef<IDoc>(this.collectionId, queryRequest, this.memoryDb);
   }
 }
 
-class MemoryQueryCollectionRef {
+class MemoryQueryCollectionRef<IDoc> implements IMemoryQueryCollectionRef<IDoc> {
   constructor(private collectionId: string,
               private queryRequest: IQueryRequest,
               private memoryDb: MemoryDb) {
   }
 
   snapshot() {
-    return this.memoryDb.getQuerySnapshot(this.collectionId, this.queryRequest);
+    return this.memoryDb.getQuerySnapshot<IDoc>(this.collectionId, this.queryRequest);
   }
 
   onSnapshot() {
@@ -65,6 +71,8 @@ class MemoryQueryCollectionRef {
 class MemoryCollection {
   private internalDocs: BehaviorSubject<Map<string, any>> = new BehaviorSubject(new Map());
 
+  // todo: find the way do fix it
+  // tslint:disable-next-line:member-ordering
   readonly changes$ = this.internalDocs.asObservable().pipe(
     shareReplay(1)
   );
@@ -107,8 +115,8 @@ export class MemoryDb {
     return new MemoryDocRef(collectionId, docId, this);
   }
 
-  collection(collectionId: string) {
-    return new MemoryCollectionRef(collectionId, this);
+  collection<IDoc>(collectionId: string) {
+    return new MemoryCollectionRef<IDoc>(collectionId, this);
   }
 
   collections() {
@@ -153,10 +161,10 @@ export class MemoryDb {
     return collection && collection.remove(docId);
   }
 
-  getDocSnapshot(collectionId: string, docId: string) {
+  getDocSnapshot<IDoc>(collectionId: string, docId: string) {
     const collection = this.innerCollections.get(collectionId);
 
-    return new DocSnapshot(docId, collection && collection.get(docId));
+    return new DocSnapshot<IDoc>(docId, collection && collection.get(docId));
   }
 
   getDocOnSnapshot(collectionId: string, docId: string) {
@@ -171,7 +179,7 @@ export class MemoryDb {
     );
   }
 
-  getQuerySnapshot(collectionId: string, queryRequest: IQueryRequest) {
+  getQuerySnapshot<IDoc>(collectionId: string, queryRequest: IQueryRequest): IQuerySnapshot<IDoc> {
     if (!this.innerCollections.has(collectionId)) {
       return new QuerySnapshot([]);
     }
@@ -181,7 +189,7 @@ export class MemoryDb {
       return new DocSnapshot(id, docData);
     });
 
-    return new QuerySnapshot(docs);
+    return new QuerySnapshot<IDoc>(docs);
   }
 
   getOnQuerySnapshot(collectionId: string, queryRequest: IQueryRequest) {

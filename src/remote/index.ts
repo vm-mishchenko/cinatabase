@@ -2,24 +2,26 @@ import PouchDB from 'pouchdb';
 import PouchFind from 'pouchdb-find';
 import {BehaviorSubject, Observable, Subject} from 'rxjs';
 import {debounceTime} from 'rxjs/operators';
-import {IRemoteDatabase} from '../manager/database';
-import {IQueryRequest} from '../manager/query';
-import {DocSnapshot, QuerySnapshot} from '../manager/snapshot';
+import {IQueryRequest} from '../query';
+import {DocSnapshot, QuerySnapshot} from '../snapshot';
+import {IRemoteCollectionRef, IRemoteDatabase, IRemoteDocRef, IRemoteQueryCollectionRef} from './interfaces';
 
 PouchDB.plugin(PouchFind);
 
-class RemoteDocRef {
+class RemoteDocRef<IDoc> implements IRemoteDocRef<IDoc> {
   private databaseDocId = `${this.collectionId}:${this.docId}`;
 
   constructor(private collectionId: string, private docId: string, private provider: any) {
   }
 
-  update(newData: any) {
+  update(newData: Partial<IDoc>) {
     // todo: provider should care about how to save doc, not remote doc
     return this.getRawDoc().then((rawData) => {
+
       return this.provider.put({
         ...rawData,
-        ...newData
+        // todo: fix it
+        ...(newData as Object)
       });
     });
   }
@@ -36,7 +38,7 @@ class RemoteDocRef {
   }
 
   /** Create new doc if doesn't exist and set data */
-  set(newData) {
+  set(newData: IDoc) {
     return this.isExist().then(() => {
       return this.getRawDoc().then((rawData) => {
         const {_id, type, id, _rev, ...previousData} = rawData;
@@ -47,7 +49,8 @@ class RemoteDocRef {
           _rev,
           id,
           type,
-          ...newData
+          // todo: fix it
+          ...(newData as Object)
         });
       });
     }, () => {
@@ -80,19 +83,19 @@ class RemoteDocRef {
     return this.provider.get(this.databaseDocId);
   }
 
-  private extractDoc(rawDoc) {
+  private extractDoc(rawDoc: any) {
     const {_id, _rev, type, ...doc} = rawDoc;
 
     return doc;
   }
 }
 
-class RemoteCollectionRef {
+class RemoteCollectionRef<IDoc> implements IRemoteCollectionRef<IDoc> {
   constructor(private collectionId: string, private provider: any) {
   }
 
   doc(docId: string) {
-    return new RemoteDocRef(this.collectionId, docId, this.provider);
+    return new RemoteDocRef<IDoc>(this.collectionId, docId, this.provider);
   }
 
   query(query: IQueryRequest = {}) {
@@ -100,7 +103,7 @@ class RemoteCollectionRef {
   }
 }
 
-class RemoteQueryCollectionRef {
+class RemoteQueryCollectionRef<IDoc> implements IRemoteQueryCollectionRef<IDoc> {
   constructor(private collectionId: string, private query: IQueryRequest, private provider: any) {
   }
 
@@ -121,7 +124,7 @@ class RemoteQueryCollectionRef {
         return new DocSnapshot(id, doc);
       });
 
-      return new QuerySnapshot(docs);
+      return new QuerySnapshot<IDoc>(docs);
     });
   }
 }

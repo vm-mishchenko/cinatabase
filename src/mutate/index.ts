@@ -1,4 +1,4 @@
-import {IDatabase} from '../database';
+import {IDatabase} from '../database/interfaces';
 import {DocIdentificator} from '../query';
 import {SyncServer} from '../sync';
 

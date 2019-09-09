@@ -59,7 +59,7 @@
     "ts-jest": "24.0.0",
     "tslint": "^5.18.0",
     "tslint-config-prettier": "^1.18.0",
-    "typescript": "3.5.3",
+    "typescript": "3.1.6",
     "pouchdb": "^7.0.0",
     "pouchdb-find": "^7.0.0"
   },

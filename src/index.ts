@@ -1,7 +1,8 @@
-import {CollectionRef, DatabaseManager, DocRef} from './manager/database';
-import {DocSnapshot, QuerySnapshot} from './manager/snapshot';
+import {CollectionRef, DatabaseManager, DocRef} from './manager';
 import {MemoryDb} from './memory';
 import {InMemoryRemoteProvider, PouchDbRemoteProvider, RemoteDb} from './remote';
+import {DocSnapshot, QuerySnapshot} from './snapshot';
+import {IDocSnapshot, IQuerySnapshot} from './snapshot/interfaces';
 
 // PLAYGROUND
 const memoryDb = new MemoryDb();
@@ -20,5 +21,7 @@ export {
   DocRef,
   CollectionRef,
   DocSnapshot,
-  QuerySnapshot
+  QuerySnapshot,
+  IDocSnapshot,
+  IQuerySnapshot
 };

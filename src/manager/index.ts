@@ -1,13 +1,16 @@
+import {IMemoryDatabase} from '../memory/interfaces';
 import {IUpdateDocOptions, MutateServer} from '../mutate';
 import {DocIdentificator, IQueryRequest, QueryIdentificator} from '../query';
+import {IRemoteDatabase} from '../remote/interfaces';
 import {IQuerySnapshotOptions, SnapshotServer} from '../snapshot';
 import {ISyncOptions, SyncServer} from '../sync';
+import {ICollectionQueryRef, ICollectionRef, IDocRef} from './interfaces';
 
 /**
  * Represent Document from client point of view.
  * Gather input data from the client and translate it to internal calls.
  */
-export class DocRef {
+export class DocRef<IDoc> implements IDocRef<IDoc> {
   private docIdentificator = new DocIdentificator(this.collectionId, this.docId);
 
   constructor(private collectionId: string,
@@ -40,11 +43,11 @@ export class DocRef {
    * Client does care whether doc was taken from the memory or remote databases.
    */
   snapshot() {
-    return this.snapshotServer.docSnapshot(this.docIdentificator);
+    return this.snapshotServer.docSnapshot<IDoc>(this.docIdentificator);
   }
 
   onSnapshot() {
-    return this.snapshotServer.docOnSnapshot(this.docIdentificator);
+    return this.snapshotServer.docOnSnapshot<IDoc>(this.docIdentificator);
   }
 
   // check whether it exists in the remote store
@@ -61,7 +64,23 @@ export class DocRef {
   }
 }
 
-class CollectionQueryRef {
+export class CollectionRef<IDoc> implements ICollectionRef<IDoc> {
+  constructor(private collectionId: string,
+              private syncServer: SyncServer,
+              private mutateServer: MutateServer,
+              private snapshotServer: SnapshotServer) {
+  }
+
+  doc(docId: string) {
+    return new DocRef<IDoc>(this.collectionId, docId, this.syncServer, this.mutateServer, this.snapshotServer);
+  }
+
+  query(queryRequest: IQueryRequest = {}) {
+    return new CollectionQueryRef<IDoc>(this.collectionId, queryRequest, this.syncServer, this.snapshotServer);
+  }
+}
+
+class CollectionQueryRef<IDoc> implements ICollectionQueryRef<IDoc> {
   constructor(private collectionId: string,
               private queryRequest: IQueryRequest,
               private syncServer: SyncServer,
@@ -81,7 +100,7 @@ class CollectionQueryRef {
   }
 
   snapshot(options?: IQuerySnapshotOptions) {
-    return this.snapshotServer.querySnapshot(this.queryIdentificator(), options);
+    return this.snapshotServer.querySnapshot<IDoc>(this.queryIdentificator(), options);
   }
 
   onSnapshot(options?: IQuerySnapshotOptions) {
@@ -93,42 +112,6 @@ class CollectionQueryRef {
   }
 }
 
-export class CollectionRef {
-  constructor(private collectionId: string,
-              private syncServer: SyncServer,
-              private mutateServer: MutateServer,
-              private snapshotServer: SnapshotServer) {
-  }
-
-  doc(docId: string) {
-    return new DocRef(this.collectionId, docId, this.syncServer, this.mutateServer, this.snapshotServer);
-  }
-
-  query(queryRequest: IQueryRequest = {}) {
-    return new CollectionQueryRef(this.collectionId, queryRequest, this.syncServer, this.snapshotServer);
-  }
-}
-
-export interface IDatabase {
-  doc(collectionId: string, docId: string);
-
-  collection(collectionId: string);
-
-  removeAllData();
-}
-
-export interface IMemoryDatabase extends IDatabase {
-  // todo: need to define interface for inner databases entiites (memory/remote doc, collection)
-  collections(): any[];
-}
-
-export interface IRemoteDatabase extends IDatabase, ISyncableDatabase {
-}
-
-export interface ISyncableDatabase {
-  syncWithServer(): Promise<any>;
-}
-
 export class DatabaseManager {
   private defaultCollectionId = 'DEFAULT_COLLECTION_ID';
   private syncServer = new SyncServer(this.memory, this.remote);
@@ -138,15 +121,15 @@ export class DatabaseManager {
   constructor(private memory: IMemoryDatabase, private remote: IRemoteDatabase) {
   }
 
-  doc(docId: string) {
-    return new DocRef(this.defaultCollectionId, docId, this.syncServer, this.mutateServer, this.snapshotServer);
+  doc<IDoc>(docId: string) {
+    return new DocRef<IDoc>(this.defaultCollectionId, docId, this.syncServer, this.mutateServer, this.snapshotServer);
   }
 
-  collection(id) {
-    return new CollectionRef(id, this.syncServer, this.mutateServer, this.snapshotServer);
+  collection<IDoc>(id) {
+    return new CollectionRef<IDoc>(id, this.syncServer, this.mutateServer, this.snapshotServer);
   }
 
-  // sync database with remote server
+  // sync manager with remote server
   syncWithServer() {
     return this.syncServer.syncWithServer();
   }

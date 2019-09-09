@@ -1,5 +1,6 @@
-import {IMemoryDatabase, IRemoteDatabase} from '../database';
+import {IMemoryDatabase} from '../memory/interfaces';
 import {DocIdentificator, QueryIdentificator} from '../query';
+import {IRemoteDatabase} from '../remote/interfaces';
 
 export interface ISyncOptions {
   /** Sync even if the doc was previously synced or exists in the memory. */
@@ -178,7 +179,7 @@ export class SyncServer {
 
     const syncPromise = remoteQuery.snapshot()
       .then((remoteQuerySnapshot) => {
-        // update memory database
+        // update memory manager
         remoteQuerySnapshot.docs.forEach((remoteDocSnapshot) => {
           memoryCollection.doc(remoteDocSnapshot.id).set(remoteDocSnapshot.data());
         });

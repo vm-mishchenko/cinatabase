@@ -1,9 +1,10 @@
 import {Observable} from 'rxjs';
 import {fromPromise} from 'rxjs/internal-compatibility';
 import {shareReplay, switchMap} from 'rxjs/operators';
-import {IDatabase} from '../database';
+import {IDatabase} from '../database/interfaces';
 import {DocIdentificator, QueryIdentificator} from '../query';
 import {SyncServer} from '../sync';
+import {IDocSnapshot, IQuerySnapshot} from './interfaces';
 
 export interface IQuerySnapshotOptions {
   source?: string;
@@ -13,10 +14,10 @@ const defaultQuerySnapshotOptions = {
   source: 'remote'
 };
 
-export class DocSnapshot {
+export class DocSnapshot<IDoc> implements IDocSnapshot<IDoc> {
   exists = Boolean(this.docData);
 
-  constructor(public readonly id: string, private readonly docData: any) {
+  constructor(readonly id: string, private readonly docData: any) {
   }
 
   data() {
@@ -24,8 +25,8 @@ export class DocSnapshot {
   }
 }
 
-export class QuerySnapshot {
-  constructor(private docs: DocSnapshot[]) {
+export class QuerySnapshot<IDoc> implements IQuerySnapshot<IDoc> {
+  constructor(private docs: Array<IDocSnapshot<IDoc>>) {
   }
 
   data() {
@@ -65,24 +66,24 @@ export class SnapshotServer {
               private syncServer: SyncServer) {
   }
 
-  docSnapshot(docIdentificator: DocIdentificator): Promise<DocSnapshot> {
+  docSnapshot<IDoc>(docIdentificator: DocIdentificator): Promise<IDocSnapshot<IDoc>> {
     return this.syncServer.syncDoc(docIdentificator).then(() => {
       return this.memory.doc(docIdentificator.collectionId, docIdentificator.docId).snapshot();
     });
   }
 
-  docOnSnapshot(docIdentificator: DocIdentificator) {
+  docOnSnapshot<IDoc>(docIdentificator: DocIdentificator): Observable<IDocSnapshot<IDoc>> {
     return fromPromise(this.syncServer.syncDoc(docIdentificator)).pipe(
-      switchMap((): Observable<DocSnapshot> => {
+      switchMap((): Observable<IDocSnapshot<IDoc>> => {
         return this.memory.collection(docIdentificator.collectionId).doc(docIdentificator.docId).onSnapshot();
       }),
       shareReplay(1)
     );
   }
 
-  querySnapshot(queryIdentificator: QueryIdentificator,
-                options: IQuerySnapshotOptions = defaultQuerySnapshotOptions
-  ): Promise<QuerySnapshot> {
+  querySnapshot<IDoc>(queryIdentificator: QueryIdentificator,
+                      options: IQuerySnapshotOptions = defaultQuerySnapshotOptions
+  ): Promise<QuerySnapshot<IDoc>> {
     if (options.source === 'memory') {
       const memoryCollection = this.memory.collection(queryIdentificator.collectionId);
 
@@ -90,12 +91,13 @@ export class SnapshotServer {
     } else if (options.source === 'remote') {
       // sync service sync docs then cache synced doc ids and returns them
       return this.syncServer.syncQuery(queryIdentificator).then((docIds) => {
-        // todo: in future memory database should return docs
-        const syncedDocs = this.memory.collection(queryIdentificator.collectionId).query().snapshot().data().filter((docSnapshot) => {
-          return docIds.includes(docSnapshot.id);
-        });
+        // todo: in future memory manager should return docs
+        const syncedDocs = this.memory.collection(queryIdentificator.collectionId)
+          .query().snapshot().data().filter((docSnapshot) => {
+            return docIds.includes(docSnapshot.id);
+          });
 
-        return new QuerySnapshot(syncedDocs);
+        return new QuerySnapshot<IDoc>(syncedDocs);
       });
     } else {
       console.warn(`Snapshot does not support "${options.source}" source.`);

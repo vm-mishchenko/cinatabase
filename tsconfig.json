@@ -8,14 +8,18 @@
     "target": "es6",
     "declaration": true,
     "sourceMap": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "lib": [
+      "es2018",
+      "dom"
+    ]
   },
   "include": [
     "src"
   ],
   "exclude": [
     "dist",
-    "node_modules",
+    "./node_modules/*",
     "**/*.spec.ts"
   ]
 }
