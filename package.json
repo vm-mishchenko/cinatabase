@@ -1,6 +1,6 @@
 {
   "name": "cinatabase",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Browser local database",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
