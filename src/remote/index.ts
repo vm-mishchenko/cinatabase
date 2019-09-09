@@ -215,17 +215,17 @@ export class PouchDbRemoteProvider {
 
       toUpdatePackage['subject'] = subject;
 
-      toUpdatePackage['subscription'] = subject.subscribe((data: any) => {
-        const resolve = this.toUpdate[data._id].resolve;
-        const reject = this.toUpdate[data._id].reject;
+      toUpdatePackage['subscription'] = subject.subscribe((latestData: any) => {
+        const resolve = this.toUpdate[latestData._id].resolve;
+        const reject = this.toUpdate[latestData._id].reject;
 
-        this.toUpdate[data._id].subscription.unsubscribe();
-        this.toUpdate[data._id] = null;
+        this.toUpdate[latestData._id].subscription.unsubscribe();
+        this.toUpdate[latestData._id] = null;
 
         // todo: I dont think that I need to wait for the previous execution - try to delete it
         this.queue = this.queue.then(() => {
-          return this.pouch.get(data._id).then((doc: any) => {
-            const {_rev, ...newData} = data;
+          return this.pouch.get(latestData._id).then((doc: any) => {
+            const {_rev, ...newData} = latestData;
 
             this.pouch.put({
               ...doc,
